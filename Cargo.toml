@@ -1,0 +1,38 @@
+[package]
+name = "bili"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "bili"
+path = "src/lib.rs"
+
+
+[dependencies]
+reqwest = { version = "0.13.4", features = [
+  "json",
+  "cookies",
+  "multipart",
+  "brotli",
+  "gzip",
+  "deflate",
+  "rustls",
+  "form",
+  "query",
+] }
+tokio = { version = "1.52.3", features = ["full"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+md5 = "0.8.0"
+url = "2.5.8"
+chrono = "0.4.45"
+
+
+[dev-dependencies]
+tokio = { version = "1.52.3", features = ["rt", "macros"] }
+qrcode = "0.14.1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = "symbols"

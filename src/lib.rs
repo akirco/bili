@@ -1,0 +1,21 @@
+pub mod audio;
+pub mod client;
+pub mod coin;
+pub mod comment;
+pub mod credentials;
+pub mod danmaku;
+pub mod error;
+pub mod fav;
+pub mod history;
+pub mod like;
+pub mod login;
+pub mod search;
+pub mod subtitle;
+pub mod summary;
+pub mod triple;
+pub mod user;
+pub mod video;
+pub mod wbi;
+
+pub use client::BiliClient;
+pub use error::BiliError;
