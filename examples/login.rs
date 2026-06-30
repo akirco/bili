@@ -14,9 +14,9 @@ fn main() {
     rt.block_on(async {
         let client = BiliClient::new().expect("BiliClient::new()");
 
-        // Step 1: request QR code
         let resp = client
-            .login_qrcode_generate()
+            .login()
+            .qrcode()
             .await
             .expect("generate QR code failed");
         let url = resp["data"]["url"].as_str().expect("missing qrcode url");
@@ -27,7 +27,6 @@ fn main() {
         println!("=== Bilibili 扫码登录 ===");
         println!("请用 Bilibili APP 扫描下方二维码：\n");
 
-        // render QR code in terminal
         if let Ok(code) = qrcode::QrCode::new(url.as_bytes()) {
             let image = code
                 .render::<qrcode::render::unicode::Dense1x2>()
@@ -41,11 +40,11 @@ fn main() {
         println!("二维码 key: {qrcode_key}");
         println!();
 
-        // Step 2: poll scan status
         loop {
             tokio::time::sleep(Duration::from_secs(2)).await;
             let poll = client
-                .login_qrcode_poll(qrcode_key)
+                .login()
+                .qrcode_status(qrcode_key)
                 .await
                 .expect("poll failed");
             let code = poll["data"]["code"].as_i64().unwrap_or(-1);
@@ -67,18 +66,23 @@ fn main() {
             }
         }
 
-        // Step 3: export and save cookies
-        let (sessdata, bili_jct, buvid3, dedeuserid) = client.export_cookies().await;
+        let creds = client.export_cookies().await;
         println!();
-        println!("  sessdata:    {:?}", sessdata.as_ref().map(|s| &s[..8]));
-        println!("  bili_jct:    {:?}", bili_jct.as_ref().map(|s| &s[..8]));
-        println!("  dedeuserid:  {:?}", dedeuserid);
+        println!(
+            "  sessdata:    {:?}",
+            creds.sessdata.as_ref().map(|s| &s[..8])
+        );
+        println!(
+            "  bili_jct:    {:?}",
+            creds.bili_jct.as_ref().map(|s| &s[..8])
+        );
+        println!("  dedeuserid:  {:?}", creds.dedeuserid);
 
         let json = serde_json::json!({
-            "sessdata": sessdata,
-            "bili_jct": bili_jct,
-            "buvid3": buvid3,
-            "dedeuserid": dedeuserid,
+            "sessdata": creds.sessdata,
+            "bili_jct": creds.bili_jct,
+            "buvid3": creds.buvid3,
+            "dedeuserid": creds.dedeuserid,
         });
         std::fs::write("cookies.json", serde_json::to_string_pretty(&json).unwrap())
             .expect("write cookies.json");

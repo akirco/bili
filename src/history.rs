@@ -1,86 +1,56 @@
-use crate::client::BiliClient;
+use crate::client::{BiliClientInner, FormBuilder, Params};
 use crate::error::BiliError;
-use std::collections::HashMap;
+use std::sync::Arc;
 
-impl BiliClient {
-    /// Get history (cursor pagination)
-    ///
-    /// # Arguments
-    ///
-    /// * `max` - Max history ID for pagination (default 0)
-    /// * `view_at` - View timestamp for pagination (default 0)
-    /// * `business` - Business type filter (optional, e.g. "archive" for videos)
-    /// * `ps` - Items per page (default 20)
-    ///
-    /// # Returns
-    ///
-    /// Returns the full JSON Value containing history list and cursor info
-    ///
-    /// # Errors
-    ///
-    /// * `BiliError::Http` - HTTP request failed
-    /// * `BiliError::Json` - JSON parsing failed
-    pub async fn history_cursor(
-        &self,
-        max: Option<i64>,
-        view_at: Option<i64>,
-        business: Option<&str>,
-        ps: Option<i64>,
-    ) -> Result<serde_json::Value, BiliError> {
-        let max_str = max.unwrap_or(0).to_string();
-        let view_at_str = view_at.unwrap_or(0).to_string();
-        let ps_str = ps.unwrap_or(20).to_string();
-        let business_str = business.unwrap_or("").to_string();
+#[derive(Clone)]
+pub struct HistoryClient {
+    inner: Arc<BiliClientInner>,
+}
 
-        self.get_raw(
-            "https://api.bilibili.com/x/web-interface/history/cursor",
-            &[
-                ("max", &max_str),
-                ("view_at", &view_at_str),
-                ("business", &business_str),
-                ("ps", &ps_str),
-            ],
-        )
-        .await
+impl HistoryClient {
+    pub(crate) fn new(inner: Arc<BiliClientInner>) -> Self {
+        Self { inner }
     }
 
-    /// Get watch-later list
-    ///
-    /// # Returns
-    ///
-    /// Returns the full JSON Value containing the watch-later list
-    ///
-    /// # Errors
-    ///
-    /// * `BiliError::Http` - HTTP request failed
-    /// * `BiliError::Json` - JSON parsing failed
-    pub async fn toview_list(&self) -> Result<serde_json::Value, BiliError> {
-        self.get_raw("https://api.bilibili.com/x/v2/history/toview/web", &[])
+    pub async fn list(
+        &self,
+        pn: Option<i64>,
+        ps: Option<i64>,
+    ) -> Result<serde_json::Value, BiliError> {
+        let mut params = Params::new();
+        params.push("pn", pn.unwrap_or(1).to_string());
+        params.push("ps", ps.unwrap_or(20).to_string());
+        crate::client::BiliClient { inner: self.inner.clone() }
+            .get_raw("https://api.bilibili.com/x/web-interface/history/cursor", params)
             .await
     }
 
-    /// Add to watch-later
-    ///
-    /// # Arguments
-    ///
-    /// * `aid` - Video AV ID
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success
-    ///
-    /// # Errors
-    ///
-    /// * `BiliError::Http` - HTTP request failed
-    /// * `BiliError::Json` - JSON parsing failed
-    /// * `BiliError::Api` - API returned error code
-    /// * `BiliError::CsrfNotFound` - CSRF token not found
-    pub async fn toview_add(&self, aid: i64) -> Result<(), BiliError> {
-        let csrf = self.csrf().await?;
-        let mut form = HashMap::new();
-        form.insert("aid".to_string(), aid.to_string());
-        form.insert("csrf".to_string(), csrf);
-        self.post::<()>("https://api.bilibili.com/x/v2/history/toview/add", &form)
+    pub async fn delete(&self, aid: i64) -> Result<(), BiliError> {
+        let csrf = self.inner.creds.csrf().await?;
+
+        let form = FormBuilder::new()
+            .push("aid", aid.to_string())
+            .push("history_type", "archive")
+            .push("type", "del")
+            .csrf(csrf)
+            .build();
+
+        crate::client::BiliClient { inner: self.inner.clone() }
+            .post::<serde_json::Value>("https://api.bilibili.com/x/web-interface/history/del", &form)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn clear(&self) -> Result<(), BiliError> {
+        let csrf = self.inner.creds.csrf().await?;
+
+        let form = FormBuilder::new()
+            .push("type", "clear")
+            .csrf(csrf)
+            .build();
+
+        crate::client::BiliClient { inner: self.inner.clone() }
+            .post::<serde_json::Value>("https://api.bilibili.com/x/web-interface/history/clear", &form)
             .await?;
         Ok(())
     }

@@ -12,7 +12,7 @@ fn main() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let client = BiliClient::new().expect("BiliClient::new()");
 
-    record(&rt, "login_qrcode_generate", client.login_qrcode_generate());
+    record(&rt, "login_qrcode_generate", client.login().qrcode());
 }
 
 fn record(

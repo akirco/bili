@@ -1,21 +1,41 @@
-pub mod audio;
 pub mod client;
-pub mod coin;
-pub mod comment;
 pub mod credentials;
-pub mod danmaku;
 pub mod error;
-pub mod fav;
-pub mod history;
-pub mod like;
-pub mod login;
-pub mod search;
-pub mod subtitle;
-pub mod summary;
-pub mod triple;
-pub mod user;
-pub mod video;
 pub mod wbi;
 
-pub use client::BiliClient;
+#[cfg(feature = "video")]
+pub mod video;
+
+#[cfg(feature = "user")]
+pub mod user;
+
+#[cfg(feature = "search")]
+pub mod search;
+
+#[cfg(feature = "comment")]
+pub mod comment;
+
+#[cfg(feature = "fav")]
+pub mod fav;
+
+#[cfg(feature = "danmaku")]
+pub mod danmaku;
+
+#[cfg(feature = "audio")]
+pub mod audio;
+
+#[cfg(feature = "history")]
+pub mod history;
+
+#[cfg(feature = "login")]
+pub mod login;
+
+#[cfg(feature = "subtitle")]
+pub mod subtitle;
+
+#[cfg(feature = "action")]
+pub mod action;
+
+pub use client::{BiliClient, FormBuilder, Params};
+pub use credentials::Credentials;
 pub use error::BiliError;

@@ -16,21 +16,21 @@ fn main() {
         .block_on(client.resolve_bvid(BVID))
         .expect("resolve_bvid");
 
-    record(&rt, "video_info", client.video_info(Some(aid), None));
+    record(&rt, "video_info", client.video().info(Some(aid), None));
     record(
         &rt,
         "video_info_by_bvid",
-        client.video_info(None, Some(BVID)),
+        client.video().info(None, Some(BVID)),
     );
     record(
         &rt,
         "video_playurl",
-        client.video_playurl(Some(aid), None, cid, None, None, None),
+        client.video().playurl(Some(aid), None, cid, None, None, None),
     );
-    record(&rt, "popular_videos", client.popular_videos(None, None));
-    record(&rt, "video_related", client.video_related(Some(aid), None));
-    record(&rt, "hot_videos", client.hot_videos(None, None, None));
-    record(&rt, "rank_videos", client.rank_videos("0"));
+    record(&rt, "popular_videos", client.video().popular(None, None));
+    record(&rt, "video_related", client.video().related(Some(aid), None));
+    record(&rt, "hot_videos", client.video().hot(None, None, None));
+    record(&rt, "rank_videos", client.video().rank("0"));
 }
 
 fn load_client() -> BiliClient {

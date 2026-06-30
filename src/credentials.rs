@@ -3,9 +3,18 @@ use reqwest::header::HeaderValue;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// Credentials for Bilibili authentication
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct Credentials {
+    pub sessdata: Option<String>,
+    pub bili_jct: Option<String>,
+    pub buvid3: Option<String>,
+    pub dedeuserid: Option<String>,
+}
+
 #[derive(Clone)]
 pub struct CredentialsManager {
-    inner: Arc<RwLock<CredentialsInner>>,
+    inner: Arc<RwLock<Credentials>>,
 }
 
 impl Default for CredentialsManager {
@@ -14,18 +23,10 @@ impl Default for CredentialsManager {
     }
 }
 
-#[derive(Default)]
-struct CredentialsInner {
-    sessdata: Option<String>,
-    bili_jct: Option<String>,
-    buvid3: Option<String>,
-    dedeuserid: Option<String>,
-}
-
 impl CredentialsManager {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(RwLock::new(CredentialsInner::default())),
+            inner: Arc::new(RwLock::new(Credentials::default())),
         }
     }
 
@@ -73,21 +74,26 @@ impl CredentialsManager {
             .ok_or(BiliError::CsrfNotFound)
     }
 
-    pub async fn export(
-        &self,
-    ) -> (
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    ) {
-        let inner = self.inner.read().await;
-        (
-            inner.sessdata.clone(),
-            inner.bili_jct.clone(),
-            inner.buvid3.clone(),
-            inner.dedeuserid.clone(),
-        )
+    /// Export credentials as a Credentials struct
+    pub async fn export(&self) -> Credentials {
+        self.inner.read().await.clone()
+    }
+
+    /// Import from a Credentials struct
+    pub async fn import_from(&self, creds: &Credentials) {
+        let mut inner = self.inner.write().await;
+        if let Some(v) = &creds.sessdata {
+            inner.sessdata = Some(v.clone());
+        }
+        if let Some(v) = &creds.bili_jct {
+            inner.bili_jct = Some(v.clone());
+        }
+        if let Some(v) = &creds.buvid3 {
+            inner.buvid3 = Some(v.clone());
+        }
+        if let Some(v) = &creds.dedeuserid {
+            inner.dedeuserid = Some(v.clone());
+        }
     }
 
     pub async fn import(
@@ -130,7 +136,9 @@ impl CredentialsManager {
         if cookies.is_empty() {
             None
         } else {
-            HeaderValue::from_str(&cookies.join("; ")).ok()
+            HeaderValue::from_str(&cookies.join("; "))
+                .map_err(|e| BiliError::CookieBuild(e.to_string()))
+                .ok()
         }
     }
 }

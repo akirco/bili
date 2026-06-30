@@ -11,20 +11,21 @@ fn main() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let client = load_client();
 
-    record(&rt, "search", client.search("rust", None));
+    record(&rt, "search", client.search().all("rust", None));
     record(
         &rt,
         "search_keyword",
-        client.search_keyword("bilibili", None, "video"),
+        client.search().query("bilibili", None, "video"),
     );
     record(&rt, "search_user", async {
         client
-            .search_user("bishi")
+            .search()
+            .user("bishi")
             .await
             .map(|v| serde_json::json!({"result": v}))
     });
-    record(&rt, "get_hot_search", client.get_hot_search(10));
-    record(&rt, "get_hot_word", client.get_hot_word());
+    record(&rt, "get_hot_search", client.search().hot(10));
+    record(&rt, "get_hot_word", client.search().hot_word());
 }
 
 fn load_client() -> BiliClient {

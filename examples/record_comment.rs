@@ -22,17 +22,16 @@ fn main() {
     record(
         &rt,
         "comment_list",
-        client.comment_list(1, aid, None, None, None),
+        client.comment().list(1, aid, None, None, None),
     );
     record(
         &rt,
         "comment_list_wbi",
-        client.comment_list_wbi(1, aid, None, None),
+        client.comment().list_wbi(1, aid, None, None),
     );
 
     let write = std::env::var("BILI_WRITE").is_ok_and(|v| v == "1");
     if write {
-        // post a comment first (with timestamp to avoid duplicates), get rpid then operate
         let msg = format!(
             "test comment from bili-sdk @{}",
             std::time::SystemTime::now()
@@ -40,7 +39,7 @@ fn main() {
                 .unwrap()
                 .as_secs()
         );
-        let rpid = match rt.block_on(client.comment_add(1, aid, &msg, None, None, None)) {
+        let rpid = match rt.block_on(client.comment().add(1, aid, &msg, None, None, None)) {
             Ok(v) => {
                 record_raw("comment_add", &v);
                 v["rpid"].as_i64().unwrap_or(0)
@@ -56,31 +55,36 @@ fn main() {
         if rpid > 0 {
             record_unit(&rt, "comment_like", async {
                 client
-                    .comment_like(1, aid, rpid, Some(1))
+                    .comment()
+                    .like(1, aid, rpid, Some(1))
                     .await
                     .map(|_| serde_json::json!({"success": true}))
             });
             record_unit(&rt, "comment_hate", async {
                 client
-                    .comment_hate(1, aid, rpid, Some(1))
+                    .comment()
+                    .hate(1, aid, rpid, Some(1))
                     .await
                     .map(|_| serde_json::json!({"success": true}))
             });
             record_unit(&rt, "comment_top", async {
                 client
-                    .comment_top(1, aid, rpid, Some(1))
+                    .comment()
+                    .top(1, aid, rpid, Some(1))
                     .await
                     .map(|_| serde_json::json!({"success": true}))
             });
             record_unit(&rt, "comment_report", async {
                 client
-                    .comment_report(1, aid, rpid, 1, None)
+                    .comment()
+                    .report(1, aid, rpid, 1, None)
                     .await
                     .map(|_| serde_json::json!({"success": true}))
             });
             record_unit(&rt, "comment_delete", async {
                 client
-                    .comment_delete(1, aid, rpid)
+                    .comment()
+                    .delete(1, aid, rpid)
                     .await
                     .map(|_| serde_json::json!({"success": true}))
             });

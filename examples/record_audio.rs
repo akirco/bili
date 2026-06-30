@@ -5,19 +5,13 @@
 use bili::BiliClient;
 
 const FIXTURES: &str = "fixtures";
-const BVID: &str = "BV1nDJg6mEM5";
 
 fn main() {
     std::fs::create_dir_all(FIXTURES).unwrap();
     let rt = tokio::runtime::Runtime::new().unwrap();
     let client = load_client();
 
-    let (aid, cid) = rt
-        .block_on(client.resolve_bvid(BVID))
-        .expect("resolve_bvid");
-
-    record(&rt, "ai_subtitle", client.ai_subtitle(aid, BVID, cid));
-    record(&rt, "audio_stream_url", client.audio_stream_url(100311));
+    record(&rt, "audio_stream_url", client.audio().stream_url(100311));
 }
 
 fn load_client() -> BiliClient {

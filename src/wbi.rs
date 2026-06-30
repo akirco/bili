@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const MIXIN_KEY_ENC_TAB: [usize; 64] = [
     46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33, 9, 42, 19, 29,
@@ -43,7 +43,11 @@ pub fn signed_params(
     sub_key: &str,
 ) -> HashMap<String, String> {
     let mixin_key = get_mixin_key(&format!("{}{}", img_key, sub_key));
-    let wts = chrono::Utc::now().timestamp().to_string();
+    let wts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        .to_string();
 
     params.insert("wts".to_string(), wts);
 

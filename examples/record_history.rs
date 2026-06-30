@@ -2,7 +2,6 @@
 //!
 //! Records history module API responses.
 //!   Login required; first run `cargo run --example login` to generate cookies.json
-//!   Write API (toview_add) requires BILI_WRITE=1
 
 use bili::BiliClient;
 
@@ -14,29 +13,12 @@ fn main() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let client = load_client();
 
-    let aid = rt
+    let _aid = rt
         .block_on(client.resolve_bvid(BVID))
         .expect("resolve_bvid")
         .0;
 
-    record(
-        &rt,
-        "history_cursor",
-        client.history_cursor(None, None, None, None),
-    );
-    record(&rt, "toview_list", client.toview_list());
-
-    let write = std::env::var("BILI_WRITE").is_ok_and(|v| v == "1");
-    if write {
-        record_unit(&rt, "toview_add", async {
-            client
-                .toview_add(aid)
-                .await
-                .map(|_| serde_json::json!({"success": true}))
-        });
-    } else {
-        eprintln!("SKIP toview_add: set BILI_WRITE=1");
-    }
+    record(&rt, "history_cursor", client.history().list(None, None));
 }
 
 fn load_client() -> BiliClient {
@@ -70,12 +52,4 @@ fn record(
             eprintln!("ERR {name}: {e}");
         }
     }
-}
-
-fn record_unit(
-    rt: &tokio::runtime::Runtime,
-    name: &str,
-    fut: impl std::future::Future<Output = Result<serde_json::Value, bili::BiliError>>,
-) {
-    record(rt, name, fut)
 }

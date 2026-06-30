@@ -16,25 +16,60 @@ fn main() {
         .block_on(client.resolve_bvid(BVID))
         .expect("resolve_bvid");
 
-    // get publish time from video info, infer danmaku month
     let info = rt
-        .block_on(client.video_info(None, Some(BVID)))
+        .block_on(client.video().info(None, Some(BVID)))
         .expect("video_info");
     let pubdate = info["data"]["pubdate"].as_i64().unwrap_or(0);
-    let month = chrono::DateTime::from_timestamp(pubdate, 0)
-        .map(|t| t.format("%Y-%m").to_string())
-        .unwrap_or_else(|| "2026-06".to_string());
+    let month = epoch_to_month(pubdate);
 
     record(
         &rt,
         "danmaku_snapshot",
-        client.get_danmaku_snapshot(&aid.to_string()),
+        client.danmaku().snapshot(&aid.to_string()),
     );
     record(
         &rt,
         "danmaku_history_dates",
-        client.get_danmaku_history_dates(cid, &month),
+        client.danmaku().history_dates(cid, &month),
     );
+}
+
+fn epoch_to_month(epoch: i64) -> String {
+    if epoch <= 0 {
+        return "2026-06".to_string();
+    }
+    let mut seconds = epoch as u64;
+    let mut year = 1970;
+    loop {
+        let year_seconds = if is_leap_year(year) { 366 * 24 * 60 * 60 } else { 365 * 24 * 60 * 60 };
+        if seconds < year_seconds {
+            break;
+        }
+        seconds -= year_seconds;
+        year += 1;
+    }
+    let mut month = 1;
+    let months = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    loop {
+        let m = if month == 2 && is_leap_year(year) { 29 } else { months[month - 1] };
+        let month_seconds = m as u64 * 24 * 60 * 60;
+        if seconds < month_seconds {
+            break;
+        }
+        seconds -= month_seconds;
+        month += 1;
+    }
+    format!("{year}-{month:02}")
+}
+
+fn is_leap_year(year: i32) -> bool {
+    if year % 4 != 0 {
+        return false;
+    }
+    if year % 100 != 0 {
+        return true;
+    }
+    year % 400 == 0
 }
 
 fn load_client() -> BiliClient {

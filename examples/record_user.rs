@@ -14,14 +14,13 @@ fn main() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let client = load_client();
 
-    record(&rt, "user_info", client.user_info(MID));
-    record(&rt, "user_stat", client.user_stat(MID));
-    record(&rt, "user_videos", client.user_videos(MID, None, None));
+    record(&rt, "user_info", client.user().info(MID));
+    record(&rt, "user_stat", client.user().stat(MID));
+    record(&rt, "user_videos", client.user().videos(MID, None, None));
 }
 
 fn load_client() -> BiliClient {
     let c = BiliClient::new().expect("BiliClient::new()");
-    // get_current_uid requires login; other APIs work with cookies
     if let Ok(json) = std::fs::read_to_string("cookies.json") {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
             let rt = tokio::runtime::Runtime::new().unwrap();
@@ -32,7 +31,8 @@ fn load_client() -> BiliClient {
                 v["dedeuserid"].as_str().map(String::from),
             ));
             record(&rt, "get_current_uid", async {
-                c.get_current_uid()
+                c.user()
+                    .get_current_uid()
                     .await
                     .map(|id| serde_json::json!({"uid": id}))
             });
