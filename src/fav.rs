@@ -1,90 +1,123 @@
-use crate::client::{BiliClientInner, FormBuilder, Params};
+use crate::client::{BiliClient, BiliClientInner, FormBuilder, BiliResponse, Params};
 use crate::error::BiliError;
+use crate::types::{
+    EmptyDataResult, FavDealResult, FavFolderInfo, FavFolderListResult, FavHasFavoriteResult,
+    FavResource, FavResourceId, FavResourceListResult,
+};
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct FavClient {
-    inner: Arc<BiliClientInner>,
+    client: BiliClient,
 }
 
 impl FavClient {
     pub(crate) fn new(inner: Arc<BiliClientInner>) -> Self {
-        Self { inner }
-    }
-
-    pub async fn folder_info(&self, media_id: i64) -> Result<serde_json::Value, BiliError> {
-        let mut params = Params::new();
-        params.push("media_id", media_id.to_string());
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
+        Self {
+            client: BiliClient { inner },
         }
-        .get_raw("https://api.bilibili.com/x/v3/fav/folder/info", params)
-        .await
     }
 
+    /// 获取收藏夹详细信息
+    ///
+    /// `GET https://api.bilibili.com/x/v3/fav/folder/info`
+    ///
+    /// - `media_id`: 收藏夹 id
+    pub async fn folder_info(&self, media_id: i64) -> Result<BiliResponse<FavFolderInfo>, BiliError> {
+        let params = Params::new().push("media_id", media_id.to_string());
+        self.client
+            .get("https://api.bilibili.com/x/v3/fav/folder/info", params)
+            .await
+    }
+
+    /// 获取用户创建的收藏夹列表
+    ///
+    /// `GET https://api.bilibili.com/x/v3/fav/folder/created/list-all`
+    ///
+    /// - `up_mid`: 目标用户 mid
+    /// - `r#type`: 资源类型 (默认2=视频)
+    /// - `rid`: 资源avid (可选)
     pub async fn folder_list_all(
         &self,
         up_mid: i64,
         r#type: Option<i64>,
         rid: Option<i64>,
-    ) -> Result<serde_json::Value, BiliError> {
-        let mut params = Params::new();
-        params.push("up_mid", up_mid.to_string());
-        params.push("type", r#type.unwrap_or(2).to_string());
+    ) -> Result<BiliResponse<FavFolderListResult>, BiliError> {
+        let mut params = Params::new()
+            .push("up_mid", up_mid.to_string())
+            .push("type", r#type.unwrap_or(2).to_string());
         if let Some(r) = rid {
-            params.push("rid", r.to_string());
+            params = params.push("rid", r.to_string());
         }
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .get_raw(
-            "https://api.bilibili.com/x/v3/fav/folder/created/list-all",
-            params,
-        )
-        .await
+        self.client
+            .get(
+                "https://api.bilibili.com/x/v3/fav/folder/created/list-all",
+                params,
+            )
+            .await
     }
 
+    /// 获取用户收藏的收藏夹列表
+    ///
+    /// `GET https://api.bilibili.com/x/v3/fav/folder/collected/list`
+    ///
+    /// - `up_mid`: 目标用户 mid
+    /// - `ps`: 每页项数
+    /// - `pn`: 页码
     pub async fn collected_list(
         &self,
         up_mid: i64,
         ps: Option<i64>,
         pn: Option<i64>,
-    ) -> Result<serde_json::Value, BiliError> {
-        let mut params = Params::new();
-        params.push("up_mid", up_mid.to_string());
+    ) -> Result<BiliResponse<FavFolderListResult>, BiliError> {
+        let mut params = Params::new().push("up_mid", up_mid.to_string());
         if let Some(p) = ps {
-            params.push("ps", p.to_string());
+            params = params.push("ps", p.to_string());
         }
         if let Some(p) = pn {
-            params.push("pn", p.to_string());
+            params = params.push("pn", p.to_string());
         }
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .get_raw(
-            "https://api.bilibili.com/x/v3/fav/folder/collected/list",
-            params,
-        )
-        .await
+        self.client
+            .get(
+                "https://api.bilibili.com/x/v3/fav/folder/collected/list",
+                params,
+            )
+            .await
     }
 
+    /// 批量获取收藏资源信息
+    ///
+    /// `GET https://api.bilibili.com/x/v3/fav/resource/infos`
+    ///
+    /// - `resources`: 资源列表 (格式: "avid:type,avid:type,...")
+    /// - `platform`: 平台
     pub async fn resource_infos(
         &self,
         resources: &str,
         platform: Option<&str>,
-    ) -> Result<serde_json::Value, BiliError> {
-        let mut params = Params::new();
-        params.push("resources", resources);
+    ) -> Result<Vec<FavResource>, BiliError> {
+        let mut params = Params::new().push("resources", resources);
         if let Some(p) = platform {
-            params.push("platform", p);
+            params = params.push("platform", p);
         }
-        let mut resp: serde_json::Value = crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .get_raw("https://api.bilibili.com/x/v3/fav/resource/infos", params)
-        .await?;
-        Ok(serde_json::from_value(resp["data"].take())?)
+        let resp: serde_json::Value = self
+            .client
+            .get_raw("https://api.bilibili.com/x/v3/fav/resource/infos", params)
+            .await?;
+        Ok(serde_json::from_value(resp["data"].clone())?)
     }
+
+    /// 获取收藏夹内容列表
+    ///
+    /// `GET https://api.bilibili.com/x/v3/fav/resource/list`
+    ///
+    /// - `media_id`: 收藏夹 id
+    /// - `tid`: 分区 tid
+    /// - `keyword`: 关键词
+    /// - `r#type`: 资源类型
+    /// - `ps`: 每页项数 (默认20)
+    /// - `pn`: 页码
+    /// - `platform`: 平台
     #[allow(clippy::too_many_arguments)]
     pub async fn resource_list(
         &self,
@@ -95,58 +128,67 @@ impl FavClient {
         ps: Option<i64>,
         pn: Option<i64>,
         platform: Option<&str>,
-    ) -> Result<serde_json::Value, BiliError> {
-        let mut params = Params::new();
-        params.push("media_id", media_id.to_string());
+    ) -> Result<BiliResponse<FavResourceListResult>, BiliError> {
+        let mut params = Params::new().push("media_id", media_id.to_string());
         if let Some(t) = tid {
-            params.push("tid", t.to_string());
+            params = params.push("tid", t.to_string());
         }
         if let Some(k) = keyword {
-            params.push("keyword", k);
+            params = params.push("keyword", k);
         }
         if let Some(t) = r#type {
-            params.push("type", t.to_string());
+            params = params.push("type", t.to_string());
         }
-        params.push("ps", ps.unwrap_or(20).to_string());
+        params = params.push("ps", ps.unwrap_or(20).to_string());
         if let Some(p) = pn {
-            params.push("pn", p.to_string());
+            params = params.push("pn", p.to_string());
         }
         if let Some(p) = platform {
-            params.push("platform", p);
+            params = params.push("platform", p);
         }
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .get_raw("https://api.bilibili.com/x/v3/fav/resource/list", params)
-        .await
+        self.client
+            .get("https://api.bilibili.com/x/v3/fav/resource/list", params)
+            .await
     }
 
+    /// 获取收藏资源 id 列表
+    ///
+    /// `GET https://api.bilibili.com/x/v3/fav/resource/ids`
+    ///
+    /// - `media_id`: 收藏夹 id
+    /// - `platform`: 平台
     pub async fn resource_ids(
         &self,
         media_id: i64,
         platform: Option<&str>,
-    ) -> Result<Vec<serde_json::Value>, BiliError> {
-        let mut params = Params::new();
-        params.push("media_id", media_id.to_string());
+    ) -> Result<Vec<FavResourceId>, BiliError> {
+        let mut params = Params::new().push("media_id", media_id.to_string());
         if let Some(p) = platform {
-            params.push("platform", p);
+            params = params.push("platform", p);
         }
-        let mut resp: serde_json::Value = crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .get_raw("https://api.bilibili.com/x/v3/fav/resource/ids", params)
-        .await?;
-        Ok(serde_json::from_value(resp["data"].take())?)
+        let resp: serde_json::Value = self
+            .client
+            .get_raw("https://api.bilibili.com/x/v3/fav/resource/ids", params)
+            .await?;
+        Ok(serde_json::from_value(resp["data"].clone())?)
     }
 
+    /// 创建收藏夹
+    ///
+    /// `POST https://api.bilibili.com/x/v3/fav/folder/add`
+    ///
+    /// - `title`: 收藏夹标题
+    /// - `intro`: 收藏夹简介
+    /// - `privacy`: 是否私密 (0=公开, 1=私密)
+    /// - `cover`: 收藏夹封面 url
     pub async fn folder_add(
         &self,
         title: &str,
         intro: Option<&str>,
         privacy: Option<i64>,
         cover: Option<&str>,
-    ) -> Result<serde_json::Value, BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    ) -> Result<BiliResponse<Option<FavFolderInfo>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
             .push("title", title)
@@ -156,14 +198,20 @@ impl FavClient {
             .csrf(csrf)
             .build();
 
-        let result: Option<serde_json::Value> = crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .post("https://api.bilibili.com/x/v3/fav/folder/add", &form)
-        .await?;
-        Ok(result.unwrap_or(serde_json::Value::Null))
+        self.client
+            .post_required("https://api.bilibili.com/x/v3/fav/folder/add", &form)
+            .await
     }
 
+    /// 编辑收藏夹
+    ///
+    /// `POST https://api.bilibili.com/x/v3/fav/folder/edit`
+    ///
+    /// - `media_id`: 收藏夹 id
+    /// - `title`: 收藏夹标题
+    /// - `intro`: 收藏夹简介
+    /// - `privacy`: 是否私密 (0=公开, 1=私密)
+    /// - `cover`: 收藏夹封面 url
     pub async fn folder_edit(
         &self,
         media_id: i64,
@@ -171,8 +219,8 @@ impl FavClient {
         intro: Option<&str>,
         privacy: Option<i64>,
         cover: Option<&str>,
-    ) -> Result<(), BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    ) -> Result<BiliResponse<Option<FavFolderInfo>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
             .push("media_id", media_id.to_string())
@@ -183,30 +231,38 @@ impl FavClient {
             .csrf(csrf)
             .build();
 
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .post::<serde_json::Value>("https://api.bilibili.com/x/v3/fav/folder/edit", &form)
-        .await?;
-        Ok(())
+        self.client
+            .post_required("https://api.bilibili.com/x/v3/fav/folder/edit", &form)
+            .await
     }
 
-    pub async fn folder_del(&self, media_ids: &str) -> Result<(), BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    /// 删除收藏夹
+    ///
+    /// `POST https://api.bilibili.com/x/v3/fav/folder/del`
+    ///
+    /// - `media_ids`: 收藏夹 id 列表 (逗号分隔)
+    pub async fn folder_del(&self, media_ids: &str) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
             .push("media_ids", media_ids)
             .csrf(csrf)
             .build();
 
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .post::<serde_json::Value>("https://api.bilibili.com/x/v3/fav/folder/del", &form)
-        .await?;
-        Ok(())
+        self.client
+            .post_required("https://api.bilibili.com/x/v3/fav/folder/del", &form)
+            .await
     }
 
+    /// 复制收藏资源到另一个收藏夹
+    ///
+    /// `POST https://api.bilibili.com/x/v3/fav/resource/copy`
+    ///
+    /// - `src_media_id`: 源收藏夹 id
+    /// - `tar_media_id`: 目标收藏夹 id
+    /// - `mid`: 用户 mid
+    /// - `resources`: 资源列表 (格式: "avid:type,avid:type,...")
+    /// - `platform`: 平台
     pub async fn resource_copy(
         &self,
         src_media_id: i64,
@@ -214,8 +270,8 @@ impl FavClient {
         mid: i64,
         resources: &str,
         platform: Option<&str>,
-    ) -> Result<(), BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    ) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
             .push("src_media_id", src_media_id.to_string())
@@ -226,14 +282,20 @@ impl FavClient {
             .csrf(csrf)
             .build();
 
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .post::<serde_json::Value>("https://api.bilibili.com/x/v3/fav/resource/copy", &form)
-        .await?;
-        Ok(())
+        self.client
+            .post_required("https://api.bilibili.com/x/v3/fav/resource/copy", &form)
+            .await
     }
 
+    /// 移动收藏资源到另一个收藏夹
+    ///
+    /// `POST https://api.bilibili.com/x/v3/fav/resource/move`
+    ///
+    /// - `src_media_id`: 源收藏夹 id
+    /// - `tar_media_id`: 目标收藏夹 id
+    /// - `mid`: 用户 mid
+    /// - `resources`: 资源列表 (格式: "avid:type,avid:type,...")
+    /// - `platform`: 平台
     pub async fn resource_move(
         &self,
         src_media_id: i64,
@@ -241,8 +303,8 @@ impl FavClient {
         mid: i64,
         resources: &str,
         platform: Option<&str>,
-    ) -> Result<(), BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    ) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
             .push("src_media_id", src_media_id.to_string())
@@ -253,21 +315,25 @@ impl FavClient {
             .csrf(csrf)
             .build();
 
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .post::<serde_json::Value>("https://api.bilibili.com/x/v3/fav/resource/move", &form)
-        .await?;
-        Ok(())
+        self.client
+            .post_required("https://api.bilibili.com/x/v3/fav/resource/move", &form)
+            .await
     }
 
+    /// 批量删除收藏资源
+    ///
+    /// `POST https://api.bilibili.com/x/v3/fav/resource/batch-del`
+    ///
+    /// - `media_id`: 收藏夹 id
+    /// - `resources`: 资源列表 (格式: "avid:type,avid:type,...")
+    /// - `platform`: 平台
     pub async fn resource_batch_del(
         &self,
         media_id: i64,
         resources: &str,
         platform: Option<&str>,
-    ) -> Result<(), BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    ) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
             .push("media_id", media_id.to_string())
@@ -276,35 +342,40 @@ impl FavClient {
             .csrf(csrf)
             .build();
 
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .post::<serde_json::Value>(
-            "https://api.bilibili.com/x/v3/fav/resource/batch-del",
-            &form,
-        )
-        .await?;
-        Ok(())
+        self.client
+            .post_required(
+                "https://api.bilibili.com/x/v3/fav/resource/batch-del",
+                &form,
+            )
+            .await
     }
 
-    pub async fn resource_clean(&self, media_id: i64) -> Result<(), BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    /// 清空收藏夹内容
+    ///
+    /// `POST https://api.bilibili.com/x/v3/fav/resource/clean`
+    ///
+    /// - `media_id`: 收藏夹 id
+    pub async fn resource_clean(&self, media_id: i64) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
             .push("media_id", media_id.to_string())
             .csrf(csrf)
             .build();
 
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .post::<serde_json::Value>("https://api.bilibili.com/x/v3/fav/resource/clean", &form)
-        .await?;
-        Ok(())
+        self.client
+            .post_required("https://api.bilibili.com/x/v3/fav/resource/clean", &form)
+            .await
     }
 
-    pub async fn add(&self, rid: i64, add_media_ids: i64) -> Result<serde_json::Value, BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    /// 添加视频到收藏夹
+    ///
+    /// `POST https://api.bilibili.com/x/v3/fav/resource/deal`
+    ///
+    /// - `rid`: 视频 avid
+    /// - `add_media_ids`: 目标收藏夹 id 列表 (逗号分隔)
+    pub async fn add(&self, rid: i64, add_media_ids: i64) -> Result<BiliResponse<Option<FavDealResult>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
             .push("rid", rid.to_string())
@@ -313,24 +384,27 @@ impl FavClient {
             .csrf(csrf)
             .build();
 
-        let data: Option<serde_json::Value> = crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .post("https://api.bilibili.com/x/v3/fav/resource/deal", &form)
-        .await?;
-        data.ok_or(BiliError::Parse(
-            "favorite_add response data missing".into(),
-        ))
+        self.client
+            .post_required("https://api.bilibili.com/x/v3/fav/resource/deal", &form)
+            .await
     }
 
+    /// 收藏资源操作 (添加/移除)
+    ///
+    /// `POST https://api.bilibili.com/x/v3/fav/resource/deal`
+    ///
+    /// - `rid`: 资源 id (视频 avid)
+    /// - `r#type`: 资源类型 (2=视频)
+    /// - `add_media_ids`: 添加到的收藏夹 id 列表 (逗号分隔)
+    /// - `del_media_ids`: 移除的收藏夹 id 列表 (逗号分隔)
     pub async fn resource_deal(
         &self,
         rid: i64,
         r#type: i64,
         add_media_ids: Option<&str>,
         del_media_ids: Option<&str>,
-    ) -> Result<serde_json::Value, BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    ) -> Result<BiliResponse<Option<FavDealResult>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
             .push("rid", rid.to_string())
@@ -340,36 +414,35 @@ impl FavClient {
             .csrf(csrf)
             .build();
 
-        let data: Option<serde_json::Value> = crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .post("https://api.bilibili.com/x/v3/fav/resource/deal", &form)
-        .await?;
-        data.ok_or(BiliError::Parse(
-            "fav_resource_deal response data missing".into(),
-        ))
+        self.client
+            .post_required("https://api.bilibili.com/x/v3/fav/resource/deal", &form)
+            .await
     }
 
-    pub async fn has_favorite(&self, aid: i64) -> Result<serde_json::Value, BiliError> {
-        let mut params = Params::new();
-        params.push("aid", aid.to_string());
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .get_raw("https://api.bilibili.com/x/v2/fav/video/favoured", params)
-        .await
+    /// 检查视频是否已收藏
+    ///
+    /// `GET https://api.bilibili.com/x/v2/fav/video/favoured`
+    ///
+    /// - `aid`: 视频 avid
+    pub async fn has_favorite(&self, aid: i64) -> Result<BiliResponse<FavHasFavoriteResult>, BiliError> {
+        let params = Params::new().push("aid", aid.to_string());
+        self.client
+            .get("https://api.bilibili.com/x/v2/fav/video/favoured", params)
+            .await
     }
 
-    pub async fn folder_list(&self, up_mid: i64) -> Result<serde_json::Value, BiliError> {
-        let mut params = Params::new();
-        params.push("up_mid", up_mid.to_string());
-        crate::client::BiliClient {
-            inner: self.inner.clone(),
-        }
-        .get_raw(
-            "https://api.bilibili.com/x/v3/fav/folder/created/list-all",
-            params,
-        )
-        .await
+    /// 获取用户创建的收藏夹列表 (简化版)
+    ///
+    /// `GET https://api.bilibili.com/x/v3/fav/folder/created/list-all`
+    ///
+    /// - `up_mid`: 目标用户 mid
+    pub async fn folder_list(&self, up_mid: i64) -> Result<BiliResponse<FavFolderListResult>, BiliError> {
+        let params = Params::new().push("up_mid", up_mid.to_string());
+        self.client
+            .get(
+                "https://api.bilibili.com/x/v3/fav/folder/created/list-all",
+                params,
+            )
+            .await
     }
 }

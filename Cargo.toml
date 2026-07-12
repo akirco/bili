@@ -7,6 +7,9 @@ edition = "2024"
 name = "bili"
 path = "src/lib.rs"
 
+[[bin]]
+name = "bili"
+path = "src/bin/bili.rs"
 
 [dependencies]
 reqwest = { version = "0.13.4", features = [
@@ -22,12 +25,40 @@ tokio = { version = "1.52.3", features = ["full"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 md5 = "0.8.0"
+bytes = "1"
 url = "2.5.8"
 thiserror = "2.0.12"
+clap = { version = "4", features = ["derive"] }
+qrcode = "0.14.1"
+clap_complete = "4.6.7"
 
 [features]
-default = ["video", "user", "search", "comment", "fav", "danmaku", "audio", "history", "login", "subtitle", "action"]
-full = ["video", "user", "search", "comment", "fav", "danmaku", "audio", "history", "login", "subtitle", "action"]
+default = [
+  "video",
+  "user",
+  "search",
+  "comment",
+  "fav",
+  "danmaku",
+  "audio",
+  "history",
+  "login",
+  "subtitle",
+  "action",
+]
+full = [
+  "video",
+  "user",
+  "search",
+  "comment",
+  "fav",
+  "danmaku",
+  "audio",
+  "history",
+  "login",
+  "subtitle",
+  "action",
+]
 video = []
 user = []
 search = []
@@ -43,7 +74,6 @@ action = []
 
 [dev-dependencies]
 tokio = { version = "1.52.3", features = ["rt", "macros"] }
-qrcode = "0.14.1"
 
 [profile.release]
 opt-level = "z"

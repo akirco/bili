@@ -38,4 +38,8 @@ pub enum BiliError {
     /// Cookie header build failed
     #[error("Cookie header build failed: {0}")]
     CookieBuild(String),
+
+    /// API returned null data field
+    #[error("API response data is null for {endpoint}")]
+    NullData { endpoint: String },
 }

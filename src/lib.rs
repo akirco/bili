@@ -1,6 +1,7 @@
 pub mod client;
 pub mod credentials;
 pub mod error;
+pub mod types;
 pub mod wbi;
 
 #[cfg(feature = "video")]
@@ -36,6 +37,6 @@ pub mod subtitle;
 #[cfg(feature = "action")]
 pub mod action;
 
-pub use client::{BiliClient, FormBuilder, Params};
+pub use client::{BiliClient, BiliClientBuilder, BiliResponse, FormBuilder, FormData, Params};
 pub use credentials::Credentials;
 pub use error::BiliError;

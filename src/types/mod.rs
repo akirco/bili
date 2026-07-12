@@ -1,0 +1,23 @@
+pub mod action;
+pub mod audio;
+pub mod comment;
+pub mod danmaku;
+pub mod fav;
+pub mod history;
+pub mod login;
+pub mod search;
+pub mod subtitle;
+pub mod user;
+pub mod video;
+
+pub use action::*;
+pub use audio::*;
+pub use comment::*;
+pub use danmaku::*;
+pub use fav::*;
+pub use history::*;
+pub use login::*;
+pub use search::*;
+pub use subtitle::*;
+pub use user::*;
+pub use video::*;

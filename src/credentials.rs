@@ -74,12 +74,10 @@ impl CredentialsManager {
             .ok_or(BiliError::CsrfNotFound)
     }
 
-    /// Export credentials as a Credentials struct
     pub async fn export(&self) -> Credentials {
         self.inner.read().await.clone()
     }
 
-    /// Import from a Credentials struct
     pub async fn import_from(&self, creds: &Credentials) {
         let mut inner = self.inner.write().await;
         if let Some(v) = &creds.sessdata {
@@ -118,7 +116,7 @@ impl CredentialsManager {
         }
     }
 
-    pub(crate) async fn build_cookie_header(&self) -> Option<HeaderValue> {
+    pub(crate) async fn build_cookie_header(&self) -> Result<Option<HeaderValue>, BiliError> {
         let inner = self.inner.read().await;
         let mut cookies = Vec::new();
         if let Some(ref s) = inner.sessdata {
@@ -134,11 +132,101 @@ impl CredentialsManager {
             cookies.push(format!("DedeUserID={}", d));
         }
         if cookies.is_empty() {
-            None
+            Ok(None)
         } else {
-            HeaderValue::from_str(&cookies.join("; "))
-                .map_err(|e| BiliError::CookieBuild(e.to_string()))
-                .ok()
+            let header = HeaderValue::from_str(&cookies.join("; "))
+                .map_err(|e| BiliError::CookieBuild(e.to_string()))?;
+            Ok(Some(header))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn empty_credentials_returns_none() {
+        let mgr = CredentialsManager::new();
+        assert!(mgr.build_cookie_header().await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn sessdata_only() {
+        let mgr = CredentialsManager::new();
+        mgr.set("test_sessdata", "test_jct", "test_buvid3").await;
+        let header = mgr.build_cookie_header().await.unwrap().unwrap();
+        let val = header.to_str().unwrap();
+        assert!(val.contains("SESSDATA=test_sessdata"));
+    }
+
+    #[tokio::test]
+    async fn all_cookies_present() {
+        let mgr = CredentialsManager::new();
+        mgr.set("sd", "bj", "bv").await;
+        mgr.import(None, None, None, Some("12345".to_string()))
+            .await;
+        let header = mgr.build_cookie_header().await.unwrap().unwrap();
+        let val = header.to_str().unwrap();
+        assert!(val.contains("SESSDATA=sd"));
+        assert!(val.contains("bili_jct=bj"));
+        assert!(val.contains("buvid3=bv"));
+        assert!(val.contains("DedeUserID=12345"));
+    }
+
+    #[tokio::test]
+    async fn export_import_roundtrip() {
+        let mgr = CredentialsManager::new();
+        mgr.set("sd", "bj", "bv").await;
+        mgr.import(None, None, None, Some("uid".to_string()))
+            .await;
+
+        let exported = mgr.export().await;
+        assert_eq!(exported.sessdata.as_deref(), Some("sd"));
+        assert_eq!(exported.bili_jct.as_deref(), Some("bj"));
+        assert_eq!(exported.buvid3.as_deref(), Some("bv"));
+        assert_eq!(exported.dedeuserid.as_deref(), Some("uid"));
+
+        let mgr2 = CredentialsManager::new();
+        mgr2.import_from(&exported).await;
+        let header2 = mgr2.build_cookie_header().await.unwrap().unwrap();
+        let val2 = header2.to_str().unwrap();
+        assert!(val2.contains("SESSDATA=sd"));
+        assert!(val2.contains("DedeUserID=uid"));
+    }
+
+    #[tokio::test]
+    async fn csrf_returns_bili_jct() {
+        let mgr = CredentialsManager::new();
+        assert!(mgr.csrf().await.is_err());
+
+        mgr.set("sd", "my_csrf", "bv").await;
+        assert_eq!(mgr.csrf().await.unwrap(), "my_csrf");
+    }
+
+    #[tokio::test]
+    async fn individual_getters() {
+        let mgr = CredentialsManager::new();
+        mgr.set("sd", "bj", "bv").await;
+        mgr.import(None, None, None, Some("uid".to_string()))
+            .await;
+
+        assert_eq!(mgr.get_sessdata().await.as_deref(), Some("sd"));
+        assert_eq!(mgr.get_bili_jct().await.as_deref(), Some("bj"));
+        assert_eq!(mgr.get_buvid3().await.as_deref(), Some("bv"));
+        assert_eq!(mgr.get_dedeuserid().await.as_deref(), Some("uid"));
+    }
+
+    #[tokio::test]
+    async fn import_partial_does_not_overwrite_none() {
+        let mgr = CredentialsManager::new();
+        mgr.set("original_sd", "original_bj", "original_bv").await;
+
+        mgr.import(None, Some("new_bj".to_string()), None, None)
+            .await;
+
+        assert_eq!(mgr.get_sessdata().await.as_deref(), Some("original_sd"));
+        assert_eq!(mgr.get_bili_jct().await.as_deref(), Some("new_bj"));
+        assert_eq!(mgr.get_buvid3().await.as_deref(), Some("original_bv"));
     }
 }

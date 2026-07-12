@@ -1,32 +1,45 @@
-use crate::client::{BiliClientInner, FormBuilder, Params};
+use crate::client::{BiliClient, BiliClientInner, FormBuilder, BiliResponse, Params};
 use crate::error::BiliError;
+use crate::types::{HistoryResult, ToviewResult};
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct HistoryClient {
-    inner: Arc<BiliClientInner>,
+    client: BiliClient,
 }
 
 impl HistoryClient {
     pub(crate) fn new(inner: Arc<BiliClientInner>) -> Self {
-        Self { inner }
+        Self {
+            client: BiliClient { inner },
+        }
     }
 
-    pub async fn list(
-        &self,
-        pn: Option<i64>,
-        ps: Option<i64>,
-    ) -> Result<serde_json::Value, BiliError> {
-        let mut params = Params::new();
-        params.push("pn", pn.unwrap_or(1).to_string());
-        params.push("ps", ps.unwrap_or(20).to_string());
-        crate::client::BiliClient { inner: self.inner.clone() }
-            .get_raw("https://api.bilibili.com/x/web-interface/history/cursor", params)
+    /// 获取观看历史记录
+    ///
+    /// `GET https://api.bilibili.com/x/web-interface/history/cursor`
+    ///
+    /// - `pn`: 页码 (默认1)
+    /// - `ps`: 每页项数 (默认20)
+    pub async fn list(&self, pn: Option<i64>, ps: Option<i64>) -> Result<BiliResponse<HistoryResult>, BiliError> {
+        let params = Params::new()
+            .push("pn", pn.unwrap_or(1).to_string())
+            .push("ps", ps.unwrap_or(20).to_string());
+        self.client
+            .get(
+                "https://api.bilibili.com/x/web-interface/history/cursor",
+                params,
+            )
             .await
     }
 
-    pub async fn delete(&self, aid: i64) -> Result<(), BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    /// 删除观看历史记录
+    ///
+    /// `POST https://api.bilibili.com/x/web-interface/history/del`
+    ///
+    /// - `aid`: 视频 avid
+    pub async fn delete(&self, aid: i64) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
             .push("aid", aid.to_string())
@@ -35,23 +48,105 @@ impl HistoryClient {
             .csrf(csrf)
             .build();
 
-        crate::client::BiliClient { inner: self.inner.clone() }
-            .post::<serde_json::Value>("https://api.bilibili.com/x/web-interface/history/del", &form)
-            .await?;
-        Ok(())
+        self.client
+            .post(
+                "https://api.bilibili.com/x/web-interface/history/del",
+                &form,
+            )
+            .await
     }
 
-    pub async fn clear(&self) -> Result<(), BiliError> {
-        let csrf = self.inner.creds.csrf().await?;
+    /// 清空观看历史记录
+    ///
+    /// `POST https://api.bilibili.com/x/web-interface/history/clear`
+    pub async fn clear(&self) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+        let csrf = self.client.csrf().await?;
 
-        let form = FormBuilder::new()
-            .push("type", "clear")
-            .csrf(csrf)
-            .build();
+        let form = FormBuilder::new().push("type", "clear").csrf(csrf).build();
 
-        crate::client::BiliClient { inner: self.inner.clone() }
-            .post::<serde_json::Value>("https://api.bilibili.com/x/web-interface/history/clear", &form)
-            .await?;
-        Ok(())
+        self.client
+            .post(
+                "https://api.bilibili.com/x/web-interface/history/clear",
+                &form,
+            )
+            .await
+    }
+
+    /// 获取稍后再看列表
+    ///
+    /// `GET https://api.bilibili.com/x/v2/history/toview`
+    pub async fn toview_list(&self) -> Result<BiliResponse<ToviewResult>, BiliError> {
+        self.client
+            .get(
+                "https://api.bilibili.com/x/v2/history/toview",
+                Params::new(),
+            )
+            .await
+    }
+
+    /// 添加视频到稍后再看
+    ///
+    /// `POST https://api.bilibili.com/x/v2/history/toview/add`
+    ///
+    /// - `aid`: 视频 avid (与 bvid 任选一个)
+    /// - `bvid`: 视频 bvid (与 aid 任选一个)
+    pub async fn toview_add(&self, aid: Option<i64>, bvid: Option<&str>) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+        let csrf = self.client.csrf().await?;
+
+        let mut form = FormBuilder::new().csrf(csrf);
+        if let Some(aid) = aid {
+            form = form.push("aid", aid.to_string());
+        }
+        if let Some(bvid) = bvid {
+            form = form.push("bvid", bvid.to_string());
+        }
+
+        self.client
+            .post(
+                "https://api.bilibili.com/x/v2/history/toview/add",
+                &form.build(),
+            )
+            .await
+    }
+
+    /// 从稍后再看中删除视频
+    ///
+    /// `POST https://api.bilibili.com/x/v2/history/toview/del`
+    ///
+    /// - `aid`: 视频 avid (删除指定记录)
+    /// - `viewed`: 是否删除已观看的 (true=删除所有已观看的)
+    pub async fn toview_del(&self, aid: Option<i64>, viewed: Option<bool>) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+        let csrf = self.client.csrf().await?;
+
+        let mut form = FormBuilder::new().csrf(csrf);
+        if let Some(aid) = aid {
+            form = form.push("aid", aid.to_string());
+        }
+        if let Some(true) = viewed {
+            form = form.push("viewed", "true");
+        }
+
+        self.client
+            .post(
+                "https://api.bilibili.com/x/v2/history/toview/del",
+                &form.build(),
+            )
+            .await
+    }
+
+    /// 清空稍后再看列表
+    ///
+    /// `POST https://api.bilibili.com/x/v2/history/toview/clear`
+    pub async fn toview_clear(&self) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+        let csrf = self.client.csrf().await?;
+
+        let form = FormBuilder::new().csrf(csrf).build();
+
+        self.client
+            .post(
+                "https://api.bilibili.com/x/v2/history/toview/clear",
+                &form,
+            )
+            .await
     }
 }

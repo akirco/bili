@@ -1,40 +1,62 @@
-use crate::client::{BiliClientInner, Params};
+use crate::client::{BiliClient, BiliClientInner, BiliResponse, Params};
 use crate::error::BiliError;
+use crate::types::{SubtitleContentResult, VideoSubtitle};
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct SubtitleClient {
-    inner: Arc<BiliClientInner>,
+    client: BiliClient,
 }
 
 impl SubtitleClient {
     pub(crate) fn new(inner: Arc<BiliClientInner>) -> Self {
-        Self { inner }
+        Self {
+            client: BiliClient { inner },
+        }
     }
 
-    pub async fn list(&self, aid: i64, cid: i64) -> Result<serde_json::Value, BiliError> {
-        let mut params = Params::new();
-        params.push("aid", aid.to_string());
-        params.push("cid", cid.to_string());
-        crate::client::BiliClient { inner: self.inner.clone() }
-            .get_raw("https://api.bilibili.com/x/web-interface/view?aid=", params)
+    /// 获取视频字幕列表
+    ///
+    /// `GET https://api.bilibili.com/x/web-interface/view/subtitle` (Wbi签名)
+    ///
+    /// - `aid`: 视频 avid
+    /// - `cid`: 视频 cid
+    pub async fn list(&self, aid: i64, cid: i64) -> Result<BiliResponse<VideoSubtitle>, BiliError> {
+        let params = Params::new()
+            .push("aid", aid.to_string())
+            .push("cid", cid.to_string());
+        self.client
+            .wbi_get(
+                "https://api.bilibili.com/x/web-interface/view/subtitle",
+                params,
+            )
             .await
     }
 
+    /// 获取视频字幕摘要
+    ///
+    /// `GET https://api.bilibili.com/x/web-interface/subtitle/summary`
+    ///
+    /// - `aid`: 视频 avid
+    /// - `cid`: 视频 cid
+    /// - `segment_index`: 分段索引
     pub async fn summary(
         &self,
         aid: i64,
         cid: i64,
         segment_index: Option<i64>,
-    ) -> Result<serde_json::Value, BiliError> {
-        let mut params = Params::new();
-        params.push("aid", aid.to_string());
-        params.push("cid", cid.to_string());
+    ) -> Result<BiliResponse<SubtitleContentResult>, BiliError> {
+        let mut params = Params::new()
+            .push("aid", aid.to_string())
+            .push("cid", cid.to_string());
         if let Some(s) = segment_index {
-            params.push("segment_index", s.to_string());
+            params = params.push("segment_index", s.to_string());
         }
-        crate::client::BiliClient { inner: self.inner.clone() }
-            .get_raw("https://api.bilibili.com/x/web-interface/subtitle/summary", params)
+        self.client
+            .get(
+                "https://api.bilibili.com/x/web-interface/subtitle/summary",
+                params,
+            )
             .await
     }
 }
