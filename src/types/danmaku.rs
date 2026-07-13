@@ -37,37 +37,4 @@ pub struct DanmakuElem {
     pub id_str: String,
 }
 
-/// Legacy snapshot result (kept for backward compatibility with `/x/v2/dm/ajax`)
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct DanmakuSnapshotItem {
-    pub pos: i64,
-    pub row: i64,
-    pub mode: i64,
-    pub text: String,
-    pub color: String,
-    pub dmid: i64,
-    pub weight: i64,
-    pub ctime: i64,
-    pub mid_hash: String,
-    pub is_sub: bool,
-    pub opacity: f64,
-    pub progress: i64,
-    pub weight_rank: i64,
-}
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
-pub struct DanmakuSnapshotResult {
-    pub status: i64,
-    pub aid: i64,
-    pub cid: i64,
-    pub title: String,
-    pub danmaku_count: i64,
-    pub view_count: i64,
-    pub max_row: i64,
-    pub max_pos: i64,
-    pub page: i64,
-    pub pages: i64,
-    pub items: Vec<DanmakuSnapshotItem>,
-}

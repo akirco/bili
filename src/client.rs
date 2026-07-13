@@ -271,14 +271,12 @@ impl BiliClient {
                 Params::new(),
             )
             .await
-        {
-            if let Some(buvid) = val["data"]["buvid"].as_str().map(String::from) {
+            && let Some(buvid) = val["data"]["buvid"].as_str().map(String::from) {
                 self.inner
                     .creds
                     .import(None, None, Some(buvid), None)
                     .await;
             }
-        }
     }
 
     /// 导出 Cookies 到文件
@@ -461,11 +459,15 @@ impl BiliClient {
         Ok(serde_json::from_value(raw)?)
     }
 
-    pub(crate) async fn get_bytes(&self, url: &str) -> Result<bytes::Bytes, BiliError> {
+    pub async fn get_bytes(&self, url: &str) -> Result<bytes::Bytes, BiliError> {
         let resp = self
             .send_retry(|| self.inner.http.get(url))
             .await?;
         Ok(resp.bytes().await?)
+    }
+
+    pub fn http(&self) -> &reqwest::Client {
+        &self.inner.http
     }
 
     pub async fn post<T: DeserializeOwned>(

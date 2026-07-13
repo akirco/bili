@@ -25,14 +25,19 @@ impl SearchClient {
     ///
     /// - `keyword`: 需要搜索的关键词
     /// - `page`: 页码
+    /// - `page_size`: 每页项数 (默认20)
     pub async fn all(
         &self,
         keyword: &str,
         page: Option<i64>,
+        page_size: Option<i64>,
     ) -> Result<BiliResponse<SearchAllResult>, BiliError> {
         let mut params = Params::new();
         if let Some(p) = page {
             params = params.push("page", p.to_string());
+        }
+        if let Some(ps) = page_size {
+            params = params.push("page_size", ps.to_string());
         }
         let params = params.push("keyword", keyword);
         self.client
@@ -49,6 +54,7 @@ impl SearchClient {
     ///
     /// - `keyword`: 需要搜索的关键词
     /// - `page`: 页码
+    /// - `page_size`: 每页项数 (默认20)
     /// - `search_type`: 搜索目标类型
     ///   - video: 视频
     ///   - media_bangumi: 番剧
@@ -64,11 +70,15 @@ impl SearchClient {
         &self,
         keyword: &str,
         page: Option<i64>,
+        page_size: Option<i64>,
         search_type: &str,
     ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
         let mut params = Params::new();
         if let Some(p) = page {
             params = params.push("page", p.to_string());
+        }
+        if let Some(ps) = page_size {
+            params = params.push("page_size", ps.to_string());
         }
         let params = params
             .push("search_type", search_type)

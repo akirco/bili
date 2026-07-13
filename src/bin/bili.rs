@@ -3,6 +3,7 @@ use clap::Parser;
 use clap_complete::generate;
 use qrcode::QrCode;
 use std::path::PathBuf;
+use tokio::io::AsyncWriteExt;
 
 const CONFIG_DIR: &str = ".config/bili";
 const CONFIG_FILE: &str = "cookies.json";
@@ -22,7 +23,7 @@ struct Cli {
         help_heading = "Actions"
     )]
     info: bool,
-    #[arg(long, help = "Popular videos", help_heading = "Actions")]
+    #[arg(long, help = "Popular videos [options: --pn|--ps]", help_heading = "Actions")]
     popular: bool,
     #[arg(
         long,
@@ -30,9 +31,9 @@ struct Cli {
         help_heading = "Actions"
     )]
     related: bool,
-    #[arg(long, help = "Homepage recommendations", help_heading = "Actions")]
+    #[arg(long, help = "Homepage recommendations [options: --ps]", help_heading = "Actions")]
     rcmd: bool,
-    #[arg(long, help = "Ranking by region", help_heading = "Actions")]
+    #[arg(long, help = "Ranking by region [options: --pn|--ps|--rid]", help_heading = "Actions")]
     hot: bool,
     #[arg(
         long,
@@ -42,7 +43,7 @@ struct Cli {
     user: bool,
     #[arg(
         long,
-        help = "User submitted videos [requires: --mid]",
+        help = "User submitted videos [requires: --mid] [options: --pn|--ps]",
         help_heading = "Actions"
     )]
     user_videos: bool,
@@ -50,7 +51,7 @@ struct Cli {
     user_stat: bool,
     #[arg(
         long,
-        help = "Following list [requires: --mid]",
+        help = "Following list [requires: --mid] [options: --pn|--ps]",
         help_heading = "Actions"
     )]
     followings: bool,
@@ -66,13 +67,13 @@ struct Cli {
         help_heading = "Actions"
     )]
     unfollow: bool,
-    #[arg(long, help = "Search (value=keyword)", help_heading = "Actions")]
+    #[arg(long, help = "Search (value=keyword) [options: --pn|--ps]", help_heading = "Actions")]
     search: Option<String>,
     #[arg(long, help = "Hot search words", help_heading = "Actions")]
     hot_search: bool,
     #[arg(
         long,
-        help = "Comment list [requires: --oid]",
+        help = "Comment list [requires: --oid] [options: --pn|--ps|--sort]",
         help_heading = "Actions"
     )]
     comments: bool,
@@ -106,7 +107,7 @@ struct Cli {
         help_heading = "Actions"
     )]
     send_danmaku: Option<String>,
-    #[arg(long, help = "Watch history", help_heading = "Actions")]
+    #[arg(long, help = "Watch history [options: --pn|--ps]", help_heading = "Actions")]
     history: bool,
     #[arg(long, help = "Watch later list", help_heading = "Actions")]
     toview: bool,
@@ -160,6 +161,14 @@ struct Cli {
         help_heading = "Actions"
     )]
     playurl: bool,
+    #[arg(
+        short = 'D',
+        num_args = 0..=1,
+        default_missing_value = ".",
+        help = "Download video [requires: --bvid] [value: output dir]",
+        help_heading = "Actions"
+    )]
+    download: Option<Option<String>>,
 
     // IDs
     #[arg(long, help = "Video avid", help_heading = "IDs")]
@@ -210,8 +219,6 @@ struct Cli {
     progress: Option<i64>,
     #[arg(long, help = "Region id (ranking)", help_heading = "Options")]
     rid: Option<String>,
-    #[arg(long, help = "Page number", help_heading = "Options")]
-    page: Option<i64>,
     #[arg(long, help = "Page number", help_heading = "Options")]
     pn: Option<i64>,
     #[arg(long, help = "Page size", help_heading = "Options")]
@@ -293,6 +300,7 @@ fn has_action(cli: &Cli) -> bool {
         || cli.subtitle_summary
         || cli.audio
         || cli.playurl
+        || cli.download.is_some()
         || cli.toview_add
 }
 
@@ -335,12 +343,11 @@ async fn main() {
     }
 
     // Apply --import-cookies
-    if let Some(ref path) = cli.import_cookies {
-        if let Err(e) = client.import_cookies(Some(path)).await {
+    if let Some(ref path) = cli.import_cookies
+        && let Err(e) = client.import_cookies(Some(path)).await {
             eprintln!("Failed to import cookies: {}", e);
             std::process::exit(1);
         }
-    }
 
     // Run action
     let result = match run(&cli, &client).await {
@@ -352,12 +359,11 @@ async fn main() {
     };
 
     // Export cookies
-    if let Some(ref path) = cli.export_cookies {
-        if let Err(e) = client.export_cookies(Some(path)).await {
+    if let Some(ref path) = cli.export_cookies
+        && let Err(e) = client.export_cookies(Some(path)).await {
             eprintln!("Failed to export cookies: {}", e);
             std::process::exit(1);
         }
-    }
 
     print_output(&result, cli.raw, cli.compact);
 }
@@ -371,6 +377,9 @@ async fn run(
     }
     if cli.playurl {
         return handle_playurl(cli, client).await;
+    }
+    if cli.download.is_some() {
+        return handle_download(cli, client).await;
     }
     if cli.popular {
         return handle_popular(cli, client).await;
@@ -530,6 +539,103 @@ async fn handle_playurl(
     Ok(serde_json::to_value(resp)?)
 }
 
+async fn handle_download(
+    cli: &Cli,
+    client: &BiliClient,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let bvid = cli.bvid.as_deref().ok_or("requires --bvid")?;
+    let dir = cli.download.as_ref().unwrap().as_deref().unwrap_or(".");
+
+    // 获取视频信息
+    let info_resp = client.video().info(None, Some(bvid)).await?;
+    let info = info_resp.data.ok_or("no video info")?;
+    let title = &info.title;
+    let pages = &info.pages;
+
+    eprintln!("Downloading: {} ({}, {}P)", title, bvid, pages.len());
+
+    let mut downloaded = Vec::new();
+
+    for page in pages {
+        let cid = page.cid;
+        let part_name = if pages.len() > 1 {
+            format!("{} - P{} {}", title, page.page, page.part)
+        } else {
+            title.to_string()
+        };
+
+        eprintln!("\n  [P{}/{}] {}", page.page, pages.len(), part_name);
+
+        // 获取播放地址 (DASH)
+        let url_resp = client
+            .video()
+            .playurl(None, Some(bvid), cid, None, Some(16), None)
+            .await?;
+        let url_data = url_resp.data.ok_or("no play url")?;
+
+        if let Some(dash) = &url_data.dash {
+            let video = dash
+                .video
+                .iter()
+                .max_by_key(|v| v.bandwidth)
+                .ok_or("no video stream")?;
+            let audio = dash
+                .audio
+                .iter()
+                .max_by_key(|a| a.bandwidth)
+                .ok_or("no audio stream")?;
+
+            let video_tmp = format!("{}/{}.video.m4s", dir, part_name);
+            let audio_tmp = format!("{}/{}.audio.m4s", dir, part_name);
+            let output = format!("{}/{}.mp4", dir, part_name);
+
+            eprintln!("    Video: {}p ({})", video.height, video.codecs);
+            eprintln!("    Downloading video stream...");
+            download_stream(client, &video.base_url, &video_tmp).await?;
+
+            eprintln!("    Downloading audio stream...");
+            download_stream(client, &audio.base_url, &audio_tmp).await?;
+
+            eprintln!("    Merging with ffmpeg...");
+            let status = std::process::Command::new("ffmpeg")
+                .args(["-i", &video_tmp, "-i", &audio_tmp, "-c", "copy", &output, "-y"])
+                .output()?;
+            if !status.status.success() {
+                let stderr = String::from_utf8_lossy(&status.stderr);
+                return Err(format!("ffmpeg failed: {}", stderr).into());
+            }
+
+            let _ = std::fs::remove_file(&video_tmp);
+            let _ = std::fs::remove_file(&audio_tmp);
+
+            eprintln!("    Saved: {}", output);
+            downloaded.push(output);
+        } else if let Some(durl) = url_data.durl.first() {
+            let output = format!("{}/{}.mp4", dir, part_name);
+            download_stream(client, &durl.url, &output).await?;
+            eprintln!("    Saved: {}", output);
+            downloaded.push(output);
+        } else {
+            return Err("no playable url found".into());
+        }
+    }
+
+    Ok(serde_json::json!({"status": "downloaded", "title": title, "files": downloaded}))
+}
+
+async fn download_stream(
+    client: &BiliClient,
+    url: &str,
+    path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut resp = client.http().get(url).send().await?;
+    let mut file = tokio::fs::File::create(path).await?;
+    while let Some(chunk) = resp.chunk().await? {
+        file.write_all(&chunk).await?;
+    }
+    Ok(())
+}
+
 async fn handle_user(
     cli: &Cli,
     client: &BiliClient,
@@ -594,10 +700,10 @@ async fn handle_search(
             "user" => "bili_user",
             other => other,
         };
-        let items = client.search().query(keyword, cli.page, api_type).await?;
+        let items = client.search().query(keyword, cli.pn, cli.ps, api_type).await?;
         serde_json::to_value(items)?
     } else {
-        let result = client.search().all(keyword, cli.page).await?;
+        let result = client.search().all(keyword, cli.pn, cli.ps).await?;
         serde_json::to_value(result)?
     };
     Ok(value)

@@ -19,17 +19,9 @@ pub enum BiliError {
     #[error("API error {code}: {message}")]
     Api { code: i64, message: String },
 
-    /// Login required to perform this operation
-    #[error("Login required")]
-    LoginRequired,
-
     /// CSRF token not found
     #[error("CSRF token not found")]
     CsrfNotFound,
-
-    /// WBI sign failed
-    #[error("WBI sign failed")]
-    WbiSignFailed,
 
     /// Parse error
     #[error("Parse error: {0}")]
