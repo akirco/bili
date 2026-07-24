@@ -1,4 +1,4 @@
-use crate::client::{BiliClient, BiliClientInner, FormBuilder, BiliResponse, Params};
+use crate::client::{BiliClient, BiliClientInner, BiliResponse, FormBuilder, Params};
 use crate::error::BiliError;
 use crate::types::{CommentAddResult, CommentList, CommentListWbi};
 use std::sync::Arc;
@@ -33,11 +33,11 @@ impl CommentClient {
         ps: Option<i64>,
     ) -> Result<BiliResponse<CommentList>, BiliError> {
         let params = Params::new()
-            .push("type", comment_type.to_string())
-            .push("oid", oid.to_string())
-            .push("sort", sort.unwrap_or(0).to_string())
-            .push("pn", pn.unwrap_or(1).to_string())
-            .push("ps", ps.unwrap_or(20).to_string());
+            .push_val("type", comment_type)
+            .push_val("oid", oid)
+            .push_val("sort", sort.unwrap_or(0))
+            .push_val("pn", pn.unwrap_or(1))
+            .push_val("ps", ps.unwrap_or(20));
         self.client
             .get("https://api.bilibili.com/x/v2/reply/main", params)
             .await
@@ -59,10 +59,10 @@ impl CommentClient {
         pagination_str: Option<&str>,
     ) -> Result<BiliResponse<CommentListWbi>, BiliError> {
         let mut params = Params::new()
-            .push("type", comment_type.to_string())
-            .push("oid", oid.to_string());
+            .push_val("type", comment_type)
+            .push_val("oid", oid);
         if let Some(m) = mode {
-            params = params.push("mode", m.to_string());
+            params = params.push_val("mode", m);
         }
         if let Some(p) = pagination_str {
             params = params.push("pagination_str", p);
@@ -94,17 +94,17 @@ impl CommentClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("type", comment_type.to_string())
-            .push("oid", oid.to_string())
+            .push_val("type", comment_type)
+            .push_val("oid", oid)
             .push("message", message)
-            .push_opt("root", root.map(|r| r.to_string()))
-            .push_opt("parent", parent.map(|p| p.to_string()))
-            .push_opt("plat", plat.map(|p| p.to_string()))
+            .push_opt_val("root", root)
+            .push_opt_val("parent", parent)
+            .push_opt_val("plat", plat)
             .csrf(csrf)
             .build();
 
         self.client
-            .post_required("https://api.bilibili.com/x/v2/reply/add", &form)
+            .post("https://api.bilibili.com/x/v2/reply/add", &form)
             .await
     }
 
@@ -126,10 +126,10 @@ impl CommentClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("type", comment_type.to_string())
-            .push("oid", oid.to_string())
-            .push("rpid", rpid.to_string())
-            .push_opt("action", action.map(|a| a.to_string()))
+            .push_val("type", comment_type)
+            .push_val("oid", oid)
+            .push_val("rpid", rpid)
+            .push_opt_val("action", action)
             .csrf(csrf)
             .build();
 
@@ -156,10 +156,10 @@ impl CommentClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("type", comment_type.to_string())
-            .push("oid", oid.to_string())
-            .push("rpid", rpid.to_string())
-            .push_opt("action", action.map(|a| a.to_string()))
+            .push_val("type", comment_type)
+            .push_val("oid", oid)
+            .push_val("rpid", rpid)
+            .push_opt_val("action", action)
             .csrf(csrf)
             .build();
 
@@ -175,13 +175,18 @@ impl CommentClient {
     /// - `comment_type`: 评论区类型
     /// - `oid`: 目标对象 id
     /// - `rpid`: 评论 rpid
-    pub async fn delete(&self, comment_type: i64, oid: i64, rpid: i64) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+    pub async fn delete(
+        &self,
+        comment_type: i64,
+        oid: i64,
+        rpid: i64,
+    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("type", comment_type.to_string())
-            .push("oid", oid.to_string())
-            .push("rpid", rpid.to_string())
+            .push_val("type", comment_type)
+            .push_val("oid", oid)
+            .push_val("rpid", rpid)
             .csrf(csrf)
             .build();
 
@@ -208,10 +213,10 @@ impl CommentClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("type", comment_type.to_string())
-            .push("oid", oid.to_string())
-            .push("rpid", rpid.to_string())
-            .push_opt("action", action.map(|a| a.to_string()))
+            .push_val("type", comment_type)
+            .push_val("oid", oid)
+            .push_val("rpid", rpid)
+            .push_opt_val("action", action)
             .csrf(csrf)
             .build();
 
@@ -240,10 +245,10 @@ impl CommentClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("type", comment_type.to_string())
-            .push("oid", oid.to_string())
-            .push("rpid", rpid.to_string())
-            .push("reason", reason.to_string())
+            .push_val("type", comment_type)
+            .push_val("oid", oid)
+            .push_val("rpid", rpid)
+            .push_val("reason", reason)
             .push_opt("content", content)
             .csrf(csrf)
             .build();

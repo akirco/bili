@@ -1,13 +1,13 @@
-use crate::credentials::{Credentials, CredentialsManager};
+use crate::cookie::{SharedCookieStore, default_cookie_path, new_shared};
 use crate::error::BiliError;
 use crate::wbi::{WbiCache, signed_params};
-use reqwest::header::{COOKIE, HeaderMap, HeaderValue, USER_AGENT};
 use reqwest::ClientBuilder as ReqwestClientBuilder;
 use reqwest::RequestBuilder;
+use reqwest::header::{COOKIE, HeaderMap, HeaderValue, USER_AGENT};
 use serde::de::DeserializeOwned;
 use serde::ser::SerializeMap;
-use serde_json::Value;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -28,21 +28,17 @@ pub struct BiliClient {
 #[derive(Clone)]
 pub struct BiliClientInner {
     pub http: reqwest::Client,
-    pub creds: CredentialsManager,
+    pub cookie_store: SharedCookieStore,
     pub wbi_cache: Arc<RwLock<Option<WbiCache>>>,
     pub wbi_ttl: Duration,
 }
 
 /// Helper for building URL query parameters.
-///
-/// Can be constructed from HashMaps or built incrementally.
 pub struct Params {
     items: Vec<(String, String)>,
 }
 
 /// Form data wrapper that preserves insertion order for POST bodies.
-///
-/// Serializes as a map for compatibility with `reqwest::RequestBuilder::form()`.
 pub struct FormData(Vec<(String, String)>);
 
 impl serde::Serialize for FormData {
@@ -59,9 +55,6 @@ impl serde::Serialize for FormData {
 }
 
 /// Helper for building form data (POST body).
-///
-/// Fluent API for building form data with minimal boilerplate.
-/// Items are stored in insertion order.
 pub struct FormBuilder {
     inner: Vec<(String, String)>,
 }
@@ -81,6 +74,17 @@ impl FormBuilder {
         self
     }
 
+    /// Push a key-value pair where the value implements `Display` (e.g. `i64`).
+    #[must_use]
+    pub fn push_val<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<String>,
+        V: std::fmt::Display,
+    {
+        self.inner.push((key.into(), value.to_string()));
+        self
+    }
+
     #[must_use]
     pub fn push_opt<K, V>(mut self, key: K, value: Option<V>) -> Self
     where
@@ -89,6 +93,19 @@ impl FormBuilder {
     {
         if let Some(v) = value {
             self.inner.push((key.into(), v.into()));
+        }
+        self
+    }
+
+    /// Push an optional key-value pair where the value implements `Display`.
+    #[must_use]
+    pub fn push_opt_val<K, V>(mut self, key: K, value: Option<V>) -> Self
+    where
+        K: Into<String>,
+        V: std::fmt::Display,
+    {
+        if let Some(v) = value {
+            self.inner.push((key.into(), v.to_string()));
         }
         self
     }
@@ -125,6 +142,42 @@ impl Params {
         self
     }
 
+    /// Push a key-value pair where the value implements `Display` (e.g. `i64`).
+    #[must_use]
+    pub fn push_val<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<String>,
+        V: std::fmt::Display,
+    {
+        self.items.push((key.into(), value.to_string()));
+        self
+    }
+
+    #[must_use]
+    pub fn push_opt<K, V>(mut self, key: K, value: Option<V>) -> Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        if let Some(v) = value {
+            self.items.push((key.into(), v.into()));
+        }
+        self
+    }
+
+    /// Push an optional key-value pair where the value implements `Display`.
+    #[must_use]
+    pub fn push_opt_val<K, V>(mut self, key: K, value: Option<V>) -> Self
+    where
+        K: Into<String>,
+        V: std::fmt::Display,
+    {
+        if let Some(v) = value {
+            self.items.push((key.into(), v.to_string()));
+        }
+        self
+    }
+
     pub fn as_query(&self) -> Vec<(&str, &str)> {
         self.items
             .iter()
@@ -134,6 +187,18 @@ impl Params {
 
     pub fn into_hashmap(self) -> HashMap<String, String> {
         self.items.into_iter().collect()
+    }
+
+    pub(crate) fn insert(&mut self, key: String, value: String) {
+        self.items.push((key, value));
+    }
+
+    pub(crate) fn sort_by_key(&mut self) {
+        self.items.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.items.iter().map(|(k, v)| (k.as_str(), v.as_str()))
     }
 }
 
@@ -164,6 +229,7 @@ pub struct BiliClientBuilder {
     user_agent: &'static str,
     referer: &'static str,
     wbi_ttl: Duration,
+    cookie_path: PathBuf,
 }
 
 impl Default for BiliClientBuilder {
@@ -175,6 +241,7 @@ impl Default for BiliClientBuilder {
             user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             referer: "https://www.bilibili.com",
             wbi_ttl: Duration::from_secs(3600 * 6),
+            cookie_path: default_cookie_path(),
         }
     }
 }
@@ -220,6 +287,13 @@ impl BiliClientBuilder {
         self
     }
 
+    /// Cookie 持久化文件路径（默认 `~/.config/bili/cookies.json`）
+    #[must_use]
+    pub fn cookie_path(mut self, path: PathBuf) -> Self {
+        self.cookie_path = path;
+        self
+    }
+
     pub fn build(self) -> Result<BiliClient, BiliError> {
         let mut headers = self.headers;
         headers.insert(USER_AGENT, HeaderValue::from_static(self.user_agent));
@@ -234,7 +308,7 @@ impl BiliClientBuilder {
         Ok(BiliClient {
             inner: Arc::new(BiliClientInner {
                 http,
-                creds: CredentialsManager::new(),
+                cookie_store: new_shared(self.cookie_path),
                 wbi_cache: Arc::new(RwLock::new(None)),
                 wbi_ttl: self.wbi_ttl,
             }),
@@ -251,57 +325,31 @@ impl BiliClient {
         BiliClientBuilder::default()
     }
 
+    /// Parse cookies from a URL's query parameters.
     pub async fn parse_cookies(&self, url: &str) -> Result<(), BiliError> {
-        let parsed = url::Url::parse(url).map_err(|e| BiliError::Parse(e.to_string()))?;
-        self.inner.creds.set_from_url(&parsed).await;
-        Ok(())
-    }
-
-    pub async fn csrf(&self) -> Result<String, BiliError> {
-        self.inner.creds.csrf().await
-    }
-
-    async fn try_fetch_buvid3(&self) {
-        if self.inner.creds.get_buvid3().await.is_some() {
-            return;
+        let parsed = reqwest::Url::parse(url).map_err(|e| BiliError::Parse(e.to_string()))?;
+        if let Ok(mut store) = self.inner.cookie_store.lock() {
+            store.set_from_url(&parsed);
         }
-        if let Ok(val) = self
-            .get_raw(
-                "https://api.bilibili.com/x/web-frontend/getbuvid",
-                Params::new(),
-            )
-            .await
-            && let Some(buvid) = val["data"]["buvid"].as_str().map(String::from) {
-                self.inner
-                    .creds
-                    .import(None, None, Some(buvid), None)
-                    .await;
-            }
-    }
-
-    /// 导出 Cookies 到文件
-    ///
-    /// - `path`: 导出路径 (默认为当前目录 `cookies.json`)
-    pub async fn export_cookies(&self, path: Option<&str>) -> Result<Credentials, BiliError> {
-        self.try_fetch_buvid3().await;
-        let creds = self.inner.creds.export().await;
-        let file_path = path.unwrap_or("cookies.json");
-        let json = serde_json::to_string_pretty(&creds)?;
-        std::fs::write(file_path, &json).map_err(|e| BiliError::CookieBuild(e.to_string()))?;
-        Ok(creds)
-    }
-
-    /// 从文件导入 Cookies
-    ///
-    /// - `path`: 文件路径 (默认为当前目录 `cookies.json`)
-    pub async fn import_cookies(&self, path: Option<&str>) -> Result<(), BiliError> {
-        let file_path = path.unwrap_or("cookies.json");
-        let json = std::fs::read_to_string(file_path)
-            .map_err(|e| BiliError::CookieBuild(e.to_string()))?;
-        let creds: Credentials =
-            serde_json::from_str(&json).map_err(|e| BiliError::CookieBuild(e.to_string()))?;
-        self.inner.creds.import_from(&creds).await;
         Ok(())
+    }
+
+    /// Get CSRF token from cookie store.
+    pub async fn csrf(&self) -> Result<String, BiliError> {
+        self.inner
+            .cookie_store
+            .lock()
+            .map(|s| s.csrf_token().to_string())
+            .map_err(|_| BiliError::CookieBuild("cookie store lock poisoned".into()))
+    }
+
+    /// Check if the user is logged in.
+    pub async fn is_logged_in(&self) -> bool {
+        self.inner
+            .cookie_store
+            .lock()
+            .map(|s| s.is_logged_in())
+            .unwrap_or(false)
     }
 
     async fn try_wbi_cache(&self) -> Option<(String, String)> {
@@ -316,12 +364,10 @@ impl BiliClient {
     }
 
     pub(crate) async fn get_wbi_keys(&self) -> Result<(String, String), BiliError> {
-        // Fast path: read lock
         if let Some(keys) = self.try_wbi_cache().await {
             return Ok(keys);
         }
 
-        // Slow path: write lock with double-check
         let mut cache = self.inner.wbi_cache.write().await;
         if let Some(ref c) = *cache
             && c.is_valid()
@@ -368,16 +414,20 @@ impl BiliClient {
     }
 
     async fn with_cookie(&self, req: RequestBuilder) -> Result<RequestBuilder, BiliError> {
-        if let Some(cookie) = self.inner.creds.build_cookie_header().await? {
+        let cookie_header = self
+            .inner
+            .cookie_store
+            .lock()
+            .map_err(|_| BiliError::CookieBuild("cookie store lock poisoned".into()))?
+            .build_cookie_header();
+        if let Some(cookie) = cookie_header {
             Ok(req.header(COOKIE, cookie))
         } else {
             Ok(req)
         }
     }
 
-    /// Send a request with retry on transient failures (timeout, connection reset).
-    ///
-    /// Uses exponential backoff: 100ms, 200ms, 400ms.
+    /// Send a request with retry on transient failures.
     async fn send_retry<F>(&self, build: F) -> Result<reqwest::Response, BiliError>
     where
         F: Fn() -> RequestBuilder,
@@ -386,7 +436,16 @@ impl BiliClient {
         for attempt in 0..3 {
             let req = self.with_cookie(build()).await?;
             match req.send().await {
-                Ok(resp) => return Ok(resp),
+                Ok(resp) => {
+                    // Auto-export Set-Cookie from response
+                    {
+                        let headers = resp.headers().clone();
+                        if let Ok(mut store) = self.inner.cookie_store.lock() {
+                            store.update_from_response(&headers);
+                        }
+                    }
+                    return Ok(resp);
+                }
                 Err(e) if attempt < 2 && (e.is_timeout() || e.is_connect()) => {
                     tokio::time::sleep(delay).await;
                     delay *= 2;
@@ -401,10 +460,10 @@ impl BiliClient {
         &self,
         url: &str,
         params: Params,
-    ) -> Result<Value, BiliError> {
+    ) -> Result<serde_json::Value, BiliError> {
         let (img_key, sub_key) = self.get_wbi_keys().await?;
-        let signed = signed_params(params.into_hashmap(), &img_key, &sub_key);
-        self.get_raw(url, Params::from(signed)).await
+        let signed = signed_params(params, &img_key, &sub_key);
+        self.get_raw(url, signed).await
     }
 
     pub(crate) async fn wbi_get<T: DeserializeOwned>(
@@ -427,7 +486,7 @@ impl BiliClient {
         Ok(resp.json().await?)
     }
 
-    pub async fn get_raw(&self, url: &str, params: Params) -> Result<Value, BiliError> {
+    pub async fn get_raw(&self, url: &str, params: Params) -> Result<serde_json::Value, BiliError> {
         let resp = self
             .send_retry(|| self.inner.http.get(url).query(&params.as_query()))
             .await?;
@@ -439,12 +498,17 @@ impl BiliClient {
         url: &str,
         params: Params,
         form: &FormData,
-    ) -> Result<Value, BiliError> {
+    ) -> Result<serde_json::Value, BiliError> {
         let (img_key, sub_key) = self.get_wbi_keys().await?;
-        let signed = signed_params(params.into_hashmap(), &img_key, &sub_key);
-        let params = Params::from(signed);
+        let signed = signed_params(params, &img_key, &sub_key);
         let resp = self
-            .send_retry(|| self.inner.http.post(url).query(&params.as_query()).form(form))
+            .send_retry(|| {
+                self.inner
+                    .http
+                    .post(url)
+                    .query(&signed.as_query())
+                    .form(form)
+            })
             .await?;
         Ok(resp.json().await?)
     }
@@ -459,11 +523,9 @@ impl BiliClient {
         Ok(serde_json::from_value(raw)?)
     }
 
-    pub async fn get_bytes(&self, url: &str) -> Result<bytes::Bytes, BiliError> {
-        let resp = self
-            .send_retry(|| self.inner.http.get(url))
-            .await?;
-        Ok(resp.bytes().await?)
+    pub async fn get_bytes(&self, url: &str) -> Result<Vec<u8>, BiliError> {
+        let resp = self.send_retry(|| self.inner.http.get(url)).await?;
+        Ok(resp.bytes().await?.to_vec())
     }
 
     pub fn http(&self) -> &reqwest::Client {
@@ -479,14 +541,6 @@ impl BiliClient {
             .send_retry(|| self.inner.http.post(url).form(form))
             .await?;
         Ok(resp.json().await?)
-    }
-
-    pub(crate) async fn post_required<T: DeserializeOwned>(
-        &self,
-        url: &str,
-        form: &FormData,
-    ) -> Result<BiliResponse<Option<T>>, BiliError> {
-        self.post(url, form).await
     }
 
     pub async fn resolve_bvid(&self, bvid: &str) -> Result<(i64, i64), BiliError> {
@@ -566,15 +620,16 @@ mod tests {
     #[test]
     fn params_new_is_empty() {
         let p = Params::new();
-        assert!(p.items.is_empty());
+        assert!(p.iter().next().is_none());
     }
 
     #[test]
     fn params_push_chain() {
         let p = Params::new().push("a", "1").push("b", "2");
-        assert_eq!(p.items.len(), 2);
-        assert_eq!(p.items[0], ("a".to_string(), "1".to_string()));
-        assert_eq!(p.items[1], ("b".to_string(), "2".to_string()));
+        let items: Vec<_> = p.iter().collect();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0], ("a", "1"));
+        assert_eq!(items[1], ("b", "2"));
     }
 
     #[test]
@@ -597,14 +652,35 @@ mod tests {
         let mut map = HashMap::new();
         map.insert("k".to_string(), "v".to_string());
         let p = Params::from(map);
-        assert_eq!(p.items.len(), 1);
+        assert_eq!(p.iter().count(), 1);
     }
 
     #[test]
     fn params_from_vec() {
         let v = vec![("a".to_string(), "1".to_string())];
         let p = Params::from(v);
-        assert_eq!(p.items, vec![("a".to_string(), "1".to_string())]);
+        let items: Vec<_> = p.iter().collect();
+        assert_eq!(items, vec![("a", "1")]);
+    }
+
+    #[test]
+    fn params_push_val() {
+        let p = Params::new().push("a", "str").push_val("b", 42i64);
+        let items: Vec<_> = p.iter().collect();
+        assert_eq!(items, vec![("a", "str"), ("b", "42")]);
+    }
+
+    #[test]
+    fn params_push_opt_val_none() {
+        let p = Params::new().push("a", "1").push_opt_val("b", None::<i64>);
+        assert_eq!(p.iter().count(), 1);
+    }
+
+    #[test]
+    fn params_push_opt_val_some() {
+        let p = Params::new().push_opt_val("b", Some(42i64));
+        let items: Vec<_> = p.iter().collect();
+        assert_eq!(items, vec![("b", "42")]);
     }
 
     #[test]
@@ -618,7 +694,9 @@ mod tests {
 
     #[test]
     fn form_builder_push_opt_none() {
-        let f = FormBuilder::new().push("a", "1").push_opt("b", None::<String>);
+        let f = FormBuilder::new()
+            .push("a", "1")
+            .push_opt("b", None::<String>);
         let data = f.build();
         assert_eq!(data.0.len(), 1);
     }
@@ -632,7 +710,9 @@ mod tests {
 
     #[test]
     fn form_builder_csrf() {
-        let f = FormBuilder::new().push("aid", "1").csrf("token123".to_string());
+        let f = FormBuilder::new()
+            .push("aid", "1")
+            .csrf("token123".to_string());
         let data = f.build();
         assert_eq!(data.0.last().unwrap().0, "csrf");
         assert_eq!(data.0.last().unwrap().1, "token123");

@@ -11,6 +11,7 @@ pub struct LoginQrcodeResult {
 #[serde(default)]
 pub struct LoginQrcodeStatusResult {
     pub code: i64,
+    pub message: String,
     pub url: Option<String>,
     pub refresh_token: Option<String>,
     pub timestamp: Option<i64>,

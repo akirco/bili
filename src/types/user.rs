@@ -223,6 +223,7 @@ pub struct UserInfo {
     pub user_honour_info: Option<UserHonourInfo>,
     pub is_followed: bool,
     pub top_photo: String,
+    #[serde(default)]
     pub theme: serde_json::Value,
     pub sys_notice: Option<UserSysNotice>,
     pub live_room: Option<UserLiveRoom>,

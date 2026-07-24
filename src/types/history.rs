@@ -5,25 +5,59 @@ use super::video::{VideoDimension, VideoOwner, VideoPage, VideoRights, VideoStat
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub struct HistoryItem {
-    pub oid: i64,
-    pub progress: i64,
-    pub cid: i64,
-    pub mid: i64,
-    pub type_history: i64,
-    pub business: String,
-    pub src: String,
     pub title: String,
+    pub long_title: String,
     pub cover: String,
-    pub page: i64,
-    pub part: String,
+    pub covers: Option<Vec<String>>,
+    pub uri: String,
+    pub history: HistoryItemHistory,
+    pub videos: i64,
+    pub author_name: String,
+    pub author_face: String,
+    pub author_mid: i64,
+    pub view_at: i64,
+    pub progress: i64,
+    pub badge: String,
+    pub show_title: String,
     pub duration: i64,
-    pub aid: i64,
+    pub current: String,
+    pub total: i64,
+    pub new_desc: String,
+    pub is_finish: i64,
+    pub is_fav: i64,
+    pub kid: i64,
+    pub tag_name: String,
+    pub live_status: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct HistoryItemHistory {
+    pub oid: i64,
+    pub epid: i64,
     pub bvid: String,
-    pub epid: Option<i64>,
-    pub season_id: Option<i64>,
-    pub vt: Option<i64>,
-    pub ctime: i64,
-    pub mtime: i64,
+    pub page: i64,
+    pub cid: i64,
+    pub part: String,
+    pub business: String,
+    pub dt: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct HistoryTab {
+    #[serde(rename = "type")]
+    pub tab_type: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct HistoryCursor {
+    pub max: i64,
+    pub view_at: i64,
+    pub business: String,
+    pub ps: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -31,8 +65,10 @@ pub struct HistoryItem {
 pub struct HistoryResult {
     pub list: Vec<HistoryItem>,
     pub has_more: bool,
-    pub max_dtime: i64,
-    pub view_at: i64,
+    pub cursor: HistoryCursor,
+    pub tab: Vec<HistoryTab>,
+    pub business: String,
+    pub ps: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]

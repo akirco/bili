@@ -1,6 +1,8 @@
-use crate::client::{BiliClient, BiliClientInner, FormBuilder, BiliResponse, Params};
+use crate::client::{BiliClient, BiliClientInner, BiliResponse, FormBuilder, Params};
 use crate::error::BiliError;
-use crate::types::{BatchModifyResult, RelationFollowingResult, UserInfo, UserStat, UserVideoListResult};
+use crate::types::{
+    BatchModifyResult, RelationFollowingResult, UserInfo, UserStat, UserVideoListResult,
+};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -21,9 +23,21 @@ impl UserClient {
     ///
     /// - `mid`: 目标用户 mid
     pub async fn info(&self, mid: i64) -> Result<BiliResponse<UserInfo>, BiliError> {
-        let params = Params::new().push("mid", mid.to_string());
+        let params = Params::new().push_val("mid", mid);
         self.client
             .wbi_get("https://api.bilibili.com/x/space/wbi/acc/info", params)
+            .await
+    }
+
+    /// 获取当前登录用户自己的信息
+    ///
+    /// `GET https://api.bilibili.com/x/web-interface/nav`
+    pub async fn mine(&self) -> Result<serde_json::Value, BiliError> {
+        self.client
+            .get_raw(
+                "https://api.bilibili.com/x/web-interface/nav",
+                Params::new(),
+            )
             .await
     }
 
@@ -41,9 +55,9 @@ impl UserClient {
         ps: Option<i64>,
     ) -> Result<BiliResponse<UserVideoListResult>, BiliError> {
         let params = Params::new()
-            .push("mid", mid.to_string())
-            .push("pn", pn.unwrap_or(1).to_string())
-            .push("ps", ps.unwrap_or(30).to_string());
+            .push_val("mid", mid)
+            .push_val("pn", pn.unwrap_or(1))
+            .push_val("ps", ps.unwrap_or(30));
         self.client
             .wbi_get("https://api.bilibili.com/x/space/wbi/arc/search", params)
             .await
@@ -55,7 +69,7 @@ impl UserClient {
     ///
     /// - `mid`: 目标用户 mid
     pub async fn stat(&self, mid: i64) -> Result<BiliResponse<UserStat>, BiliError> {
-        let params = Params::new().push("mid", mid.to_string());
+        let params = Params::new().push_val("mid", mid);
         self.client
             .get("https://api.bilibili.com/x/space/upstat", params)
             .await
@@ -63,7 +77,14 @@ impl UserClient {
 
     /// 获取当前登录用户的 UID
     pub async fn get_current_uid(&self) -> Result<i64, BiliError> {
-        let uid = self.client.inner.creds.get_dedeuserid().await;
+        let uid = self
+            .client
+            .inner
+            .cookie_store
+            .lock()
+            .map_err(|_| BiliError::CookieBuild("cookie store lock poisoned".into()))?
+            .get("DedeUserID")
+            .map(String::from);
         uid.and_then(|s| s.parse().ok())
             .ok_or(BiliError::Parse("Cannot get current user UID".into()))
     }
@@ -73,10 +94,13 @@ impl UserClient {
     /// `POST https://api.bilibili.com/x/relation/modify`
     ///
     /// - `fid`: 目标用户 mid
-    pub async fn follow(&self, fid: i64) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+    pub async fn follow(
+        &self,
+        fid: i64,
+    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
         let csrf = self.client.csrf().await?;
         let form = FormBuilder::new()
-            .push("fid", fid.to_string())
+            .push_val("fid", fid)
             .push("act", "1")
             .csrf(csrf)
             .build();
@@ -90,10 +114,13 @@ impl UserClient {
     /// `POST https://api.bilibili.com/x/relation/modify`
     ///
     /// - `fid`: 目标用户 mid
-    pub async fn unfollow(&self, fid: i64) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+    pub async fn unfollow(
+        &self,
+        fid: i64,
+    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
         let csrf = self.client.csrf().await?;
         let form = FormBuilder::new()
-            .push("fid", fid.to_string())
+            .push_val("fid", fid)
             .push("act", "2")
             .csrf(csrf)
             .build();
@@ -107,10 +134,13 @@ impl UserClient {
     /// `POST https://api.bilibili.com/x/relation/modify`
     ///
     /// - `fid`: 目标用户 mid
-    pub async fn remove_follower(&self, fid: i64) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+    pub async fn remove_follower(
+        &self,
+        fid: i64,
+    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
         let csrf = self.client.csrf().await?;
         let form = FormBuilder::new()
-            .push("fid", fid.to_string())
+            .push_val("fid", fid)
             .push("act", "7")
             .csrf(csrf)
             .build();
@@ -126,7 +156,10 @@ impl UserClient {
     /// - `fids`: 目标用户 mid 列表
     ///
     /// 返回失败的 fid 列表
-    pub async fn batch_follow(&self, fids: &[i64]) -> Result<BiliResponse<Option<BatchModifyResult>>, BiliError> {
+    pub async fn batch_follow(
+        &self,
+        fids: &[i64],
+    ) -> Result<BiliResponse<Option<BatchModifyResult>>, BiliError> {
         let csrf = self.client.csrf().await?;
         let fids_str = fids
             .iter()
@@ -139,10 +172,7 @@ impl UserClient {
             .csrf(csrf)
             .build();
         self.client
-            .post::<BatchModifyResult>(
-                "https://api.bilibili.com/x/relation/batch/modify",
-                &form,
-            )
+            .post::<BatchModifyResult>("https://api.bilibili.com/x/relation/batch/modify", &form)
             .await
     }
 
@@ -153,7 +183,10 @@ impl UserClient {
     /// - `fids`: 目标用户 mid 列表
     ///
     /// 返回失败的 fid 列表
-    pub async fn batch_block(&self, fids: &[i64]) -> Result<BiliResponse<Option<BatchModifyResult>>, BiliError> {
+    pub async fn batch_block(
+        &self,
+        fids: &[i64],
+    ) -> Result<BiliResponse<Option<BatchModifyResult>>, BiliError> {
         let csrf = self.client.csrf().await?;
         let fids_str = fids
             .iter()
@@ -166,10 +199,7 @@ impl UserClient {
             .csrf(csrf)
             .build();
         self.client
-            .post::<BatchModifyResult>(
-                "https://api.bilibili.com/x/relation/batch/modify",
-                &form,
-            )
+            .post::<BatchModifyResult>("https://api.bilibili.com/x/relation/batch/modify", &form)
             .await
     }
 
@@ -188,12 +218,12 @@ impl UserClient {
         ps: Option<i64>,
         pn: Option<i64>,
     ) -> Result<BiliResponse<RelationFollowingResult>, BiliError> {
-        let mut params = Params::new().push("vmid", vmid.to_string());
+        let mut params = Params::new().push_val("vmid", vmid);
         if let Some(p) = ps {
-            params = params.push("ps", p.to_string());
+            params = params.push_val("ps", p);
         }
         if let Some(p) = pn {
-            params = params.push("pn", p.to_string());
+            params = params.push_val("pn", p);
         }
         self.client
             .get("https://api.bilibili.com/x/relation/followings", params)

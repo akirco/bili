@@ -22,9 +22,7 @@ impl SubtitleClient {
     /// - `aid`: 视频 avid
     /// - `cid`: 视频 cid
     pub async fn list(&self, aid: i64, cid: i64) -> Result<BiliResponse<VideoSubtitle>, BiliError> {
-        let params = Params::new()
-            .push("aid", aid.to_string())
-            .push("cid", cid.to_string());
+        let params = Params::new().push_val("aid", aid).push_val("cid", cid);
         self.client
             .wbi_get(
                 "https://api.bilibili.com/x/web-interface/view/subtitle",
@@ -46,11 +44,9 @@ impl SubtitleClient {
         cid: i64,
         segment_index: Option<i64>,
     ) -> Result<BiliResponse<SubtitleContentResult>, BiliError> {
-        let mut params = Params::new()
-            .push("aid", aid.to_string())
-            .push("cid", cid.to_string());
+        let mut params = Params::new().push_val("aid", aid).push_val("cid", cid);
         if let Some(s) = segment_index {
-            params = params.push("segment_index", s.to_string());
+            params = params.push_val("segment_index", s);
         }
         self.client
             .get(

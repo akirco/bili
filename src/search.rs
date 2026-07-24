@@ -1,8 +1,6 @@
 use crate::client::{BiliClient, BiliClientInner, BiliResponse, Params};
 use crate::error::BiliError;
-use crate::types::{
-    SearchAllResult, SearchHotWordResult, SearchSquareResult,
-};
+use crate::types::{SearchAllResult, SearchHotWordResult, SearchSquareResult, SearchTypeResult};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -34,10 +32,10 @@ impl SearchClient {
     ) -> Result<BiliResponse<SearchAllResult>, BiliError> {
         let mut params = Params::new();
         if let Some(p) = page {
-            params = params.push("page", p.to_string());
+            params = params.push_val("page", p);
         }
         if let Some(ps) = page_size {
-            params = params.push("page_size", ps.to_string());
+            params = params.push_val("page_size", ps);
         }
         let params = params.push("keyword", keyword);
         self.client
@@ -72,13 +70,13 @@ impl SearchClient {
         page: Option<i64>,
         page_size: Option<i64>,
         search_type: &str,
-    ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+    ) -> Result<BiliResponse<SearchTypeResult>, BiliError> {
         let mut params = Params::new();
         if let Some(p) = page {
-            params = params.push("page", p.to_string());
+            params = params.push_val("page", p);
         }
         if let Some(ps) = page_size {
-            params = params.push("page_size", ps.to_string());
+            params = params.push_val("page_size", ps);
         }
         let params = params
             .push("search_type", search_type)
@@ -97,11 +95,23 @@ impl SearchClient {
     /// `GET https://api.bilibili.com/x/web-interface/wbi/search/type` (search_type=bili_user)
     ///
     /// - `keyword`: 需要搜索的关键词
-    pub async fn user(&self, keyword: &str) -> Result<BiliResponse<serde_json::Value>, BiliError> {
-        let params = Params::new()
+    /// - `page`: 页码
+    /// - `page_size`: 每页项数 (默认20)
+    pub async fn user(
+        &self,
+        keyword: &str,
+        page: Option<i64>,
+        page_size: Option<i64>,
+    ) -> Result<BiliResponse<SearchTypeResult>, BiliError> {
+        let mut params = Params::new()
             .push("search_type", "bili_user")
-            .push("keyword", keyword)
-            .push("page", "1");
+            .push("keyword", keyword);
+        if let Some(p) = page {
+            params = params.push_val("page", p);
+        }
+        if let Some(ps) = page_size {
+            params = params.push_val("page_size", ps);
+        }
 
         self.client
             .wbi_get(
@@ -118,7 +128,7 @@ impl SearchClient {
     /// - `limit`: 结果限制 (范围 [1, 50])
     pub async fn hot(&self, limit: i64) -> Result<BiliResponse<SearchSquareResult>, BiliError> {
         let params = Params::new()
-            .push("limit", limit.to_string())
+            .push_val("limit", limit)
             .push("platform", "web");
         self.client
             .wbi_get(
@@ -135,10 +145,7 @@ impl SearchClient {
     /// 榜单每隔固定时间统计一次，请求后返回搜索前10的关键词
     pub async fn hot_word(&self) -> Result<BiliResponse<SearchHotWordResult>, BiliError> {
         self.client
-            .get(
-                "https://s.search.bilibili.com/main/hotword",
-                Params::new(),
-            )
+            .get("https://s.search.bilibili.com/main/hotword", Params::new())
             .await
     }
 }

@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-
-
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SearchVideo {
@@ -239,7 +237,7 @@ pub struct SearchUserOfficialVerify {
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SearchUser {
-    pub r#type: serde_json::Value,
+    pub r#type: String,
     pub mid: i64,
     pub uname: String,
     pub usign: String,
@@ -356,6 +354,42 @@ pub struct SearchSquareResult {
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SearchAllResult {
-    pub result: Vec<serde_json::Value>,
-    pub page: Option<serde_json::Value>,
+    pub seid: String,
+    pub page: i64,
+    pub page_size: i64,
+    pub num_results: i64,
+    pub num_pages: i64,
+    pub suggest_keyword: String,
+    pub rqt_type: String,
+    #[serde(rename = "cost_time")]
+    pub cost_time: serde_json::Value,
+    pub exp_list: serde_json::Value,
+    #[serde(rename = "egg_hit")]
+    pub egg_hit: i64,
+    pub pageinfo: serde_json::Value,
+    pub top_tlist: serde_json::Value,
+    pub show_column: i64,
+    pub show_module_list: Vec<String>,
+    pub result: Vec<SearchResultItem>,
+}
+
+/// 分类搜索 API 响应
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SearchTypeResult {
+    pub seid: String,
+    pub page: i64,
+    pub pagesize: i64,
+    pub num_results: i64,
+    pub num_pages: i64,
+    pub suggest_keyword: String,
+    pub rqt_type: String,
+    #[serde(rename = "cost_time")]
+    pub cost_time: serde_json::Value,
+    pub exp_list: serde_json::Value,
+    #[serde(rename = "egg_hit")]
+    pub egg_hit: i64,
+    pub pageinfo: serde_json::Value,
+    pub result: serde_json::Value,
+    pub show_column: i64,
 }

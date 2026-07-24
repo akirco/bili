@@ -22,7 +22,7 @@ impl AudioClient {
     /// - `sid`: 音频 sid
     pub async fn stream_url(&self, sid: i64) -> Result<BiliResponse<AudioStreamUrl>, BiliError> {
         let params = Params::new()
-            .push("sid", sid.to_string())
+            .push_val("sid", sid)
             .push("privilege", "2")
             .push("quality", "2");
         self.client

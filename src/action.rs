@@ -1,6 +1,6 @@
-use crate::client::{BiliClient, BiliClientInner, FormBuilder, BiliResponse, Params};
+use crate::client::{BiliClient, BiliClientInner, BiliResponse, FormBuilder, Params};
 use crate::error::BiliError;
-use crate::types::{CoinResult, HasCoinResult, TripleResult};
+use crate::types::{CoinResult, HasCoinResult, HasLikeResult, TripleResult};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -31,8 +31,8 @@ impl ActionClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("aid", aid.to_string())
-            .push("multiply", multiply.unwrap_or(1).to_string())
+            .push_val("aid", aid)
+            .push_val("multiply", multiply.unwrap_or(1))
             .push_opt(
                 "select_like",
                 select_like.filter(|&v| v).map(|_| "1".to_string()),
@@ -41,7 +41,7 @@ impl ActionClient {
             .build();
 
         self.client
-            .post_required("https://api.bilibili.com/x/web-interface/coin/add", &form)
+            .post("https://api.bilibili.com/x/web-interface/coin/add", &form)
             .await
     }
 
@@ -51,7 +51,7 @@ impl ActionClient {
     ///
     /// - `aid`: 稿件 avid
     pub async fn has_coin(&self, aid: i64) -> Result<BiliResponse<HasCoinResult>, BiliError> {
-        let params = Params::new().push("aid", aid.to_string());
+        let params = Params::new().push_val("aid", aid);
         self.client
             .get(
                 "https://api.bilibili.com/x/web-interface/archive/coins",
@@ -66,12 +66,16 @@ impl ActionClient {
     ///
     /// - `aid`: 稿件 avid
     /// - `like`: true=点赞, false=取消点赞
-    pub async fn like_video(&self, aid: i64, like: bool) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+    pub async fn like_video(
+        &self,
+        aid: i64,
+        like: bool,
+    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
         let csrf = self.client.csrf().await?;
         let like_val = if like { "1" } else { "2" };
 
         let form = FormBuilder::new()
-            .push("aid", aid.to_string())
+            .push_val("aid", aid)
             .push("like", like_val)
             .csrf(csrf)
             .build();
@@ -89,8 +93,8 @@ impl ActionClient {
     /// `GET https://api.bilibili.com/x/web-interface/archive/has/like`
     ///
     /// - `aid`: 稿件 avid
-    pub async fn has_like(&self, aid: i64) -> Result<BiliResponse<serde_json::Value>, BiliError> {
-        let params = Params::new().push("aid", aid.to_string());
+    pub async fn has_like(&self, aid: i64) -> Result<BiliResponse<HasLikeResult>, BiliError> {
+        let params = Params::new().push_val("aid", aid);
         self.client
             .get(
                 "https://api.bilibili.com/x/web-interface/archive/has/like",
@@ -104,16 +108,13 @@ impl ActionClient {
     /// `POST https://api.bilibili.com/x/web-interface/archive/like/triple`
     ///
     /// - `aid`: 稿件 avid
-    pub async fn triple(&self, aid: i64    ) -> Result<BiliResponse<Option<TripleResult>>, BiliError> {
+    pub async fn triple(&self, aid: i64) -> Result<BiliResponse<Option<TripleResult>>, BiliError> {
         let csrf = self.client.csrf().await?;
 
-        let form = FormBuilder::new()
-            .push("aid", aid.to_string())
-            .csrf(csrf)
-            .build();
+        let form = FormBuilder::new().push_val("aid", aid).csrf(csrf).build();
 
         self.client
-            .post_required(
+            .post(
                 "https://api.bilibili.com/x/web-interface/archive/like/triple",
                 &form,
             )

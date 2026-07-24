@@ -1,6 +1,6 @@
-use crate::client::{BiliClient, BiliClientInner, FormBuilder, BiliResponse, Params};
+use crate::client::{BiliClient, BiliClientInner, BiliResponse, FormBuilder, Params};
 use crate::error::BiliError;
-use crate::types::{DanmakuElem, DanmakuSendResult};
+use crate::types::{DanmakuElem, DanmakuHistoryResult, DanmakuSendResult, DanmakuSnapshotResult};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -19,11 +19,7 @@ impl DanmakuClient {
     ///
     /// `cid` is the content/part ID. `segment_index` starts at 1 (each segment covers ~6 minutes).
     /// Returns parsed `DanmakuElem` entries.
-    pub async fn seg(
-        &self,
-        cid: i64,
-        segment_index: i64,
-    ) -> Result<Vec<DanmakuElem>, BiliError> {
+    pub async fn seg(&self, cid: i64, segment_index: i64) -> Result<Vec<DanmakuElem>, BiliError> {
         let url = format!(
             "https://api.bilibili.com/x/v2/dm/web/seg.so?type=1&oid={}&segment_index={}",
             cid, segment_index
@@ -53,10 +49,13 @@ impl DanmakuClient {
     }
 
     /// Legacy: fetch danmaku snapshot (old JSON API, kept for backward compatibility).
-    pub async fn snapshot(&self, aid: i64) -> Result<serde_json::Value, BiliError> {
-        let params = Params::new().push("aid", aid.to_string());
+    pub async fn snapshot(
+        &self,
+        aid: i64,
+    ) -> Result<BiliResponse<DanmakuSnapshotResult>, BiliError> {
+        let params = Params::new().push_val("aid", aid);
         self.client
-            .get_raw("https://api.bilibili.com/x/v2/dm/ajax", params)
+            .get("https://api.bilibili.com/x/v2/dm/ajax", params)
             .await
     }
 
@@ -65,13 +64,13 @@ impl DanmakuClient {
         &self,
         oid: i64,
         month: &str,
-    ) -> Result<serde_json::Value, BiliError> {
+    ) -> Result<BiliResponse<DanmakuHistoryResult>, BiliError> {
         let params = Params::new()
             .push("type", "1")
-            .push("oid", oid.to_string())
+            .push_val("oid", oid)
             .push("month", month);
         self.client
-            .get_raw("https://api.bilibili.com/x/v2/dm/history/index", params)
+            .get("https://api.bilibili.com/x/v2/dm/history/index", params)
             .await
     }
 
@@ -93,17 +92,17 @@ impl DanmakuClient {
 
         let mut form = FormBuilder::new()
             .push("type", "1")
-            .push("oid", oid.to_string())
-            .push("msg", msg.to_string())
-            .push("mode", mode.to_string())
-            .push("progress", progress.to_string())
+            .push_val("oid", oid)
+            .push("msg", msg)
+            .push_val("mode", mode)
+            .push_val("progress", progress)
             .csrf(csrf.clone());
 
         if let Some(aid) = aid {
-            form = form.push("aid", aid.to_string());
+            form = form.push_val("aid", aid);
         }
         if let Some(bvid) = bvid {
-            form = form.push("bvid", bvid.to_string());
+            form = form.push("bvid", bvid);
         }
 
         let wbi_params = Params::new()
@@ -120,12 +119,16 @@ impl DanmakuClient {
     }
 
     /// Recall a danmaku within 2 minutes (limited to 3 recalls per day).
-    pub async fn recall(&self, dmid: i64, cid: i64) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
+    pub async fn recall(
+        &self,
+        dmid: i64,
+        cid: i64,
+    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("dmid", dmid.to_string())
-            .push("cid", cid.to_string())
+            .push_val("dmid", dmid)
+            .push_val("cid", cid)
             .csrf(csrf)
             .build();
 
@@ -389,17 +392,17 @@ mod tests {
         //   id=1, progress=1000, mode=1, fontsize=25, color=0xFFFFFF,
         //   mid_hash=0, content="test", weight=0, action="", pool=0, id_str=""
         let inner = [
-            0x08, 0x01,                         // field 1: id = 1
-            0x10, 0xE8, 0x07,                    // field 2: progress = 1000
-            0x18, 0x01,                         // field 3: mode = 1
-            0x20, 0x19,                         // field 4: fontsize = 25
-            0x28, 0xFF, 0xFF, 0xFF, 0x07,        // field 5: color = 0xFFFFFF
-            0x30, 0x00,                         // field 6: mid_hash = 0
+            0x08, 0x01, // field 1: id = 1
+            0x10, 0xE8, 0x07, // field 2: progress = 1000
+            0x18, 0x01, // field 3: mode = 1
+            0x20, 0x19, // field 4: fontsize = 25
+            0x28, 0xFF, 0xFF, 0xFF, 0x07, // field 5: color = 0xFFFFFF
+            0x30, 0x00, // field 6: mid_hash = 0
             0x3A, 0x04, 0x74, 0x65, 0x73, 0x74, // field 7: content = "test"
-            0x48, 0x00,                         // field 9: weight = 0
-            0x62, 0x00,                         // field 12: action = ""
-            0x68, 0x00,                         // field 13: pool = 0
-            0x7A, 0x00,                         // field 15: id_str = ""
+            0x48, 0x00, // field 9: weight = 0
+            0x62, 0x00, // field 12: action = ""
+            0x68, 0x00, // field 13: pool = 0
+            0x7A, 0x00, // field 15: id_str = ""
         ];
         let elem = parse_dm_elem(&inner).expect("should parse");
         assert_eq!(elem.id, 1);
@@ -419,8 +422,8 @@ mod tests {
     fn test_parse_dm_elem_empty_content() {
         // Missing field 7 (content) → should return None
         let inner = [
-            0x08, 0x01,  // field 1: id = 1
-            0x10, 0x01,  // field 2: progress = 1
+            0x08, 0x01, // field 1: id = 1
+            0x10, 0x01, // field 2: progress = 1
         ];
         assert!(parse_dm_elem(&inner).is_none());
     }
@@ -429,10 +432,12 @@ mod tests {
     fn test_parse_seg_so_multiple() {
         // Two danmaku elements
         let inner1 = [
-            0x08, 0x01, 0x10, 0x01, 0x3A, 0x03, 0x61, 0x62, 0x63, // id=1, progress=1, content="abc"
+            0x08, 0x01, 0x10, 0x01, 0x3A, 0x03, 0x61, 0x62,
+            0x63, // id=1, progress=1, content="abc"
         ];
         let inner2 = [
-            0x08, 0x02, 0x10, 0x02, 0x3A, 0x03, 0x64, 0x65, 0x66, // id=2, progress=2, content="def"
+            0x08, 0x02, 0x10, 0x02, 0x3A, 0x03, 0x64, 0x65,
+            0x66, // id=2, progress=2, content="def"
         ];
 
         let mut data = Vec::new();

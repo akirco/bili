@@ -1,6 +1,8 @@
 use crate::client::{BiliClient, BiliClientInner, BiliResponse, Params};
 use crate::error::BiliError;
-use crate::types::{VideoHotResult, VideoInfo, VideoRecommendResult, VideoUrlResult};
+use crate::types::{
+    VideoHotResult, VideoInfo, VideoRcmdResult, VideoRecommendResult, VideoUrlResult,
+};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -21,10 +23,14 @@ impl VideoClient {
     ///
     /// - `aid`: 稿件 avid (与 bvid 任选一个)
     /// - `bvid`: 稿件 bvid (与 aid 任选一个)
-    pub async fn info(&self, aid: Option<i64>, bvid: Option<&str>) -> Result<BiliResponse<VideoInfo>, BiliError> {
+    pub async fn info(
+        &self,
+        aid: Option<i64>,
+        bvid: Option<&str>,
+    ) -> Result<BiliResponse<VideoInfo>, BiliError> {
         let mut params = Params::new();
         if let Some(a) = aid {
-            params = params.push("aid", a.to_string());
+            params = params.push_val("aid", a);
         }
         if let Some(b) = bvid {
             params = params.push("bvid", b);
@@ -57,17 +63,17 @@ impl VideoClient {
     ) -> Result<BiliResponse<VideoUrlResult>, BiliError> {
         let mut params = Params::new();
         if let Some(a) = aid {
-            params = params.push("avid", a.to_string());
+            params = params.push_val("avid", a);
         }
         if let Some(b) = bvid {
             params = params.push("bvid", b);
         }
-        params = params.push("cid", cid.to_string());
-        params = params.push("qn", qn.unwrap_or(80).to_string());
-        params = params.push("fnval", fnval.unwrap_or(16).to_string());
+        params = params.push_val("cid", cid);
+        params = params.push_val("qn", qn.unwrap_or(80));
+        params = params.push_val("fnval", fnval.unwrap_or(16));
         params = params.push("fnver", "0");
         if let Some(f) = fourk {
-            params = params.push("fourk", f.to_string());
+            params = params.push_val("fourk", f);
         }
 
         self.client
@@ -87,8 +93,8 @@ impl VideoClient {
         ps: Option<i64>,
     ) -> Result<BiliResponse<VideoHotResult>, BiliError> {
         let params = Params::new()
-            .push("pn", pn.unwrap_or(1).to_string())
-            .push("ps", ps.unwrap_or(20).to_string());
+            .push_val("pn", pn.unwrap_or(1))
+            .push_val("ps", ps.unwrap_or(20));
         self.client
             .get("https://api.bilibili.com/x/web-interface/popular", params)
             .await
@@ -107,7 +113,7 @@ impl VideoClient {
     ) -> Result<BiliResponse<VideoRecommendResult>, BiliError> {
         let mut params = Params::new();
         if let Some(a) = aid {
-            params = params.push("aid", a.to_string());
+            params = params.push_val("aid", a);
         }
         if let Some(b) = bvid {
             params = params.push("bvid", b);
@@ -126,17 +132,17 @@ impl VideoClient {
     ///
     /// - `fresh_type`: 刷新类型 (默认3)
     /// - `ps`: 数量 (默认20)
-    pub async fn rcmd(
-        &self,
-        ps: Option<i64>,
-    ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+    pub async fn rcmd(&self, ps: Option<i64>) -> Result<BiliResponse<VideoRcmdResult>, BiliError> {
         let params = Params::new()
             .push("fresh_type", "3")
             .push("feed_version", "V8")
             .push("fresh_idx", "1")
-            .push("ps", ps.unwrap_or(20).to_string());
+            .push_val("ps", ps.unwrap_or(20));
         self.client
-            .wbi_get("https://api.bilibili.com/x/web-interface/index/top/feed/rcmd", params)
+            .wbi_get(
+                "https://api.bilibili.com/x/web-interface/index/top/feed/rcmd",
+                params,
+            )
             .await
     }
 
@@ -154,11 +160,14 @@ impl VideoClient {
         rid: Option<&str>,
     ) -> Result<BiliResponse<VideoHotResult>, BiliError> {
         let params = Params::new()
-            .push("pn", pn.unwrap_or(1).to_string())
-            .push("ps", ps.unwrap_or(20).to_string())
+            .push_val("pn", pn.unwrap_or(1))
+            .push_val("ps", ps.unwrap_or(20))
             .push("rid", rid.unwrap_or("0"));
         self.client
-            .get("https://api.bilibili.com/x/web-interface/ranking/v2", params)
+            .get(
+                "https://api.bilibili.com/x/web-interface/ranking/v2",
+                params,
+            )
             .await
     }
 }

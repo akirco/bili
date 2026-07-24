@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use crate::client::Params;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const MIXIN_KEY_ENC_TAB: [usize; 64] = [
@@ -41,11 +41,7 @@ fn get_mixin_key(orig: &str) -> String {
         .collect()
 }
 
-pub fn signed_params(
-    mut params: HashMap<String, String>,
-    img_key: &str,
-    sub_key: &str,
-) -> HashMap<String, String> {
+pub fn signed_params(mut params: Params, img_key: &str, sub_key: &str) -> Params {
     let mixin_key = get_mixin_key(&format!("{}{}", img_key, sub_key));
     let wts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -55,22 +51,56 @@ pub fn signed_params(
 
     params.insert("wts".to_string(), wts);
 
-    let mut sorted: Vec<_> = params.iter().collect();
-    sorted.sort_by(|a, b| a.0.cmp(b.0));
+    params.sort_by_key();
 
-    let query: String = {
-        let mut ser = url::form_urlencoded::Serializer::new(String::new());
-        for (k, v) in &sorted {
-            ser.append_pair(k, v);
-        }
-        ser.finish()
-    };
+    let query: String = params
+        .iter()
+        .map(|(k, v)| format!("{}={}", percent_encode(k), percent_encode(v)))
+        .collect::<Vec<_>>()
+        .join("&");
 
     let to_hash = format!("{}{}", query, mixin_key);
     let w_rid = format!("{:x}", md5::compute(to_hash.as_bytes()));
 
     params.insert("w_rid".to_string(), w_rid);
     params
+}
+
+/// Percent-encode a string for URL query parameters.
+/// Unreserved characters (A-Z a-z 0-9 - . _ ~) and ! # $ & ' ( ) * + , ; = are kept as-is.
+/// Space is encoded as '+'. All others are percent-encoded.
+fn percent_encode(s: &str) -> String {
+    let mut result = String::with_capacity(s.len() * 3);
+    for byte in s.bytes() {
+        match byte {
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'-'
+            | b'.'
+            | b'_'
+            | b'~'
+            | b'!'
+            | b'#'
+            | b'$'
+            | b'&'
+            | b'\''
+            | b'('
+            | b')'
+            | b'*'
+            | b'+'
+            | b','
+            | b';'
+            | b'=' => {
+                result.push(byte as char);
+            }
+            b' ' => result.push('+'),
+            _ => {
+                result.push_str(&format!("%{:02X}", byte));
+            }
+        }
+    }
+    result
 }
 
 #[cfg(test)]
@@ -87,34 +117,32 @@ mod tests {
 
     #[test]
     fn signed_params_contains_wts_and_w_rid() {
-        let mut params = HashMap::new();
-        params.insert("foo".to_string(), "bar".to_string());
+        let params = Params::new().push("foo", "bar");
         let result = signed_params(params, "img_key", "sub_key");
-        assert!(result.contains_key("wts"));
-        assert!(result.contains_key("w_rid"));
-        assert_eq!(result.get("foo").unwrap(), "bar");
+        assert!(result.iter().any(|(k, _)| k == "wts"));
+        assert!(result.iter().any(|(k, _)| k == "w_rid"));
+        assert!(result.iter().any(|(k, v)| k == "foo" && v == "bar"));
     }
 
     #[test]
     fn signed_params_deterministic_for_same_input() {
-        // Two calls with identical params should produce the same w_rid
-        let mut p1 = HashMap::new();
-        p1.insert("key".to_string(), "value".to_string());
+        let p1 = Params::new().push("key", "value");
         let r1 = signed_params(p1, "img_key", "sub_key");
 
-        let mut p2 = HashMap::new();
-        p2.insert("key".to_string(), "value".to_string());
+        let p2 = Params::new().push("key", "value");
         let r2 = signed_params(p2, "img_key", "sub_key");
 
-        // wts may differ (time passed), so only check that w_rid format is valid hex
-        let rid = r1.get("w_rid").unwrap();
-        assert_eq!(rid.len(), 32); // md5 hex output is 32 chars
+        let rid = r1
+            .iter()
+            .find(|(k, _)| *k == "w_rid")
+            .unwrap()
+            .1
+            .to_string();
+        assert_eq!(rid.len(), 32);
         assert!(rid.chars().all(|c| c.is_ascii_hexdigit()));
 
-        // Same keys, same mixin → w_rid should match if wts is the same
-        // Since time may differ, just verify structure
-        assert!(r2.contains_key("wts"));
-        assert!(r2.contains_key("w_rid"));
+        assert!(r2.iter().any(|(k, _)| k == "wts"));
+        assert!(r2.iter().any(|(k, _)| k == "w_rid"));
     }
 
     #[test]
@@ -126,11 +154,8 @@ mod tests {
         );
         assert!(cache.is_valid());
 
-        let expired = WbiCache::with_ttl(
-            "img".to_string(),
-            "sub".to_string(),
-            Duration::from_secs(0),
-        );
+        let expired =
+            WbiCache::with_ttl("img".to_string(), "sub".to_string(), Duration::from_secs(0));
         std::thread::sleep(Duration::from_millis(10));
         assert!(!expired.is_valid());
     }

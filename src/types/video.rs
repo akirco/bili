@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoDescV2 {
     pub raw_text: String,
@@ -33,7 +32,6 @@ pub struct VideoRights {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoOwner {
     pub mid: i64,
@@ -54,12 +52,15 @@ pub struct VideoStat {
     pub now_rank: i64,
     pub his_rank: i64,
     pub like: i64,
+    #[serde(default)]
+    pub dislike: i64,
     pub evaluation: String,
     pub vt: i64,
+    #[serde(default)]
+    pub vv: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoArgueInfo {
     pub argue_link: String,
@@ -68,7 +69,6 @@ pub struct VideoArgueInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoDimension {
     pub width: i64,
@@ -77,7 +77,6 @@ pub struct VideoDimension {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoPage {
     pub cid: i64,
@@ -92,7 +91,6 @@ pub struct VideoPage {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoSubtitleAuthor {
     pub mid: i64,
@@ -107,7 +105,6 @@ pub struct VideoSubtitleAuthor {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoSubtitleList {
     pub id: i64,
@@ -125,7 +122,6 @@ pub struct VideoSubtitleList {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoSubtitle {
     pub allow_submit: bool,
@@ -133,7 +129,6 @@ pub struct VideoSubtitle {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoVipLabel {
     pub path: String,
@@ -151,7 +146,6 @@ pub struct VideoVipLabel {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoVip {
     pub r#type: i64,
@@ -170,7 +164,6 @@ pub struct VideoVip {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoOfficial {
     pub role: i64,
@@ -180,7 +173,6 @@ pub struct VideoOfficial {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoStaff {
     pub mid: i64,
@@ -194,7 +186,6 @@ pub struct VideoStaff {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoHonor {
     pub aid: i64,
@@ -204,21 +195,18 @@ pub struct VideoHonor {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoHonorReply {
     pub honor: Vec<VideoHonor>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoUserGarb {
     pub url_image_ani_cut: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoInfo {
     pub bvid: String,
@@ -272,11 +260,29 @@ pub struct VideoInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoHotResult {
-    pub list: Vec<serde_json::Value>,
+    pub list: Vec<VideoHotItem>,
     pub note: Option<String>,
+}
+
+/// 热门视频条目
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct VideoHotItem {
+    pub aid: i64,
+    pub bvid: String,
+    pub title: String,
+    pub pic: String,
+    pub desc: String,
+    pub duration: i64,
+    pub owner: VideoOwner,
+    pub stat: VideoStat,
+    pub pubdate: i64,
+    pub tname: String,
+    pub r#type: i64,
+    pub goto: String,
+    pub uri: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -288,7 +294,6 @@ pub struct VideoRankPage {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoRecommendItem {
     pub aid: i64,
@@ -312,23 +317,68 @@ pub struct VideoRecommendItem {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoRecommendResult {
     pub list: Vec<VideoRecommendItem>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoUrlResult {
+    #[serde(default)]
+    pub v_voucher: String,
+    #[serde(default)]
+    pub from: String,
+    #[serde(default)]
+    pub result: String,
+    #[serde(default)]
+    pub message: String,
+    #[serde(default)]
+    pub quality: i64,
+    #[serde(default)]
+    pub format: String,
+    #[serde(default)]
+    pub timelength: i64,
+    #[serde(default)]
+    pub accept_format: String,
+    #[serde(default)]
+    pub accept_description: Vec<String>,
+    #[serde(default)]
+    pub accept_quality: Vec<i64>,
+    #[serde(default)]
+    pub video_codecid: i64,
+    #[serde(default)]
+    pub seek_param: String,
+    #[serde(default)]
+    pub seek_type: String,
     pub durl: Vec<VideoUrlItem>,
     #[serde(default)]
     pub dash: Option<DashStream>,
+    #[serde(default)]
+    pub support_formats: Vec<SupportFormat>,
+    #[serde(default)]
+    pub high_format: Option<serde_json::Value>,
+    #[serde(default)]
+    pub last_play_time: i64,
+    #[serde(default)]
+    pub last_play_cid: i64,
+    #[serde(default)]
+    pub cur_language: String,
+}
+
+/// 支持的播放格式
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct SupportFormat {
+    pub quality: i64,
+    pub format: String,
+    pub new_description: String,
+    pub display_desc: String,
+    pub superscript: String,
+    pub codecs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct DashStream {
     pub duration: i64,
@@ -342,7 +392,6 @@ pub struct DashStream {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct DashVideoItem {
     pub id: i64,
@@ -359,7 +408,6 @@ pub struct DashVideoItem {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct DashAudioItem {
     pub id: i64,
@@ -372,7 +420,6 @@ pub struct DashAudioItem {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct DashDolby {
     #[serde(default)]
@@ -380,14 +427,12 @@ pub struct DashDolby {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct DashFlac {
     pub audio: Option<DashAudioItem>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-
 #[serde(default)]
 pub struct VideoUrlItem {
     pub order: i64,
@@ -397,4 +442,37 @@ pub struct VideoUrlItem {
     pub vhead: String,
     pub url: String,
     pub backup_url: Vec<String>,
+}
+
+/// 首页推荐视频列表
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct VideoRcmdResult {
+    pub item: Vec<VideoRcmdItem>,
+}
+
+/// 首页推荐视频条目
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct VideoRcmdItem {
+    pub id: i64,
+    pub bvid: String,
+    pub title: String,
+    pub pic: String,
+    pub desc: String,
+    pub duration: i64,
+    pub owner: Option<VideoOwner>,
+    pub stat: Option<VideoStat>,
+    pub goto: String,
+    pub uri: String,
+    pub r#type: i64,
+    pub jump: Option<VideoRcmdJump>,
+}
+
+/// 推荐视频跳转信息
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct VideoRcmdJump {
+    pub goto: String,
+    pub uri: String,
 }

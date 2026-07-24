@@ -10,74 +10,84 @@ path = "src/lib.rs"
 [[bin]]
 name = "bili"
 path = "src/bin/bili.rs"
+required-features = ["cli"]
 
 [dependencies]
-reqwest = { version = "0.13.4", features = [
-  "json",
-  "brotli",
-  "gzip",
-  "deflate",
-  "rustls",
-  "form",
-  "query",
-] }
-tokio = { version = "1.52.3", features = ["sync", "time", "rt-multi-thread", "macros", "fs", "io-util"] }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
-md5 = "0.8.0"
-bytes = "1"
-url = "2.5.8"
-thiserror = "2.0.12"
-clap = { version = "4", features = ["derive"] }
-qrcode = { version = "0.14.1", default-features = false }
-clap_complete = "4.6.7"
+md5 = "0.8.1"
+reqwest = {
+  version = "0.13.4",
+  features = [
+    "brotli",
+    "deflate",
+    "form",
+    "gzip",
+    "json",
+    "query",
+    "rustls",
+  ]
+}
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thiserror = "2.0.19"
+tokio = {
+  version = "1.53.1",
+  features = ["fs", "io-util", "macros", "rt-multi-thread", "sync", "time"]
+}
+
+# CLI dependencies (only compiled with `cli` feature)
+clap = { version = "4.6.4", features = ["derive"], optional = true }
+clap_complete = { version = "4.6.7", optional = true }
+qrcode = { version = "0.14.1", default-features = false, optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.53.1", features = ["macros", "rt"] }
 
 [features]
 default = [
-  "video",
-  "user",
-  "search",
-  "comment",
-  "fav",
-  "danmaku",
+  "action",
   "audio",
+  "cli",
+  "comment",
+  "danmaku",
+  "fav",
   "history",
   "login",
-  "subtitle",
-  "action",
-]
-full = [
-  "video",
-  "user",
   "search",
-  "comment",
-  "fav",
-  "danmaku",
-  "audio",
-  "history",
-  "login",
   "subtitle",
-  "action",
+  "user",
+  "video"
 ]
-video = []
-user = []
-search = []
-comment = []
-fav = []
-danmaku = []
+action = []
 audio = []
+cli = [
+  "action",
+  "audio",
+  "comment",
+  "danmaku",
+  "dep:clap",
+  "dep:clap_complete",
+  "dep:qrcode",
+  "fav",
+  "history",
+  "login",
+  "search",
+  "subtitle",
+  "user",
+  "video"
+]
+comment = []
+danmaku = []
+fav = []
 history = []
 login = []
+search = []
 subtitle = []
-action = []
-
-
-[dev-dependencies]
-tokio = { version = "1.52.3", features = ["rt", "macros"] }
+user = []
+video = []
 
 [profile.release]
-opt-level = "z"
+opt-level = "s"
+strip = true
 lto = true
-strip = "symbols"
-codegen-units = 1
 panic = "abort"
+codegen-units = 1

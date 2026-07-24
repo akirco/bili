@@ -10,6 +10,43 @@ pub struct DanmakuSendResult {
     pub visible: bool,
 }
 
+/// 弹幕快照 API 返回的弹幕条目
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct DanmakuSnapshotItem {
+    pub class: i64,
+    pub color: i64,
+    pub content_hash: String,
+    pub id_str: String,
+    pub id: i64,
+    pub key: String,
+    pub pool: i64,
+    pub send_acount: i64,
+    pub send_count: i64,
+    pub sender: DanmakuSnapshotSender,
+    pub time: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct DanmakuSnapshotSender {
+    pub mid: String,
+}
+
+/// 弹幕快照 API 响应
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct DanmakuSnapshotResult {
+    pub danmaku: Vec<DanmakuSnapshotItem>,
+}
+
+/// 弹幕历史日期 API 响应
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct DanmakuHistoryResult {
+    pub list: Vec<String>,
+}
+
 /// A single danmaku element parsed from protobuf `seg.so`.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default)]
@@ -36,5 +73,3 @@ pub struct DanmakuElem {
     /// ID as string
     pub id_str: String,
 }
-
-

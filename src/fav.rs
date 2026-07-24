@@ -1,4 +1,4 @@
-use crate::client::{BiliClient, BiliClientInner, FormBuilder, BiliResponse, Params};
+use crate::client::{BiliClient, BiliClientInner, BiliResponse, FormBuilder, Params};
 use crate::error::BiliError;
 use crate::types::{
     EmptyDataResult, FavDealResult, FavFolderInfo, FavFolderListResult, FavHasFavoriteResult,
@@ -23,8 +23,11 @@ impl FavClient {
     /// `GET https://api.bilibili.com/x/v3/fav/folder/info`
     ///
     /// - `media_id`: 收藏夹 id
-    pub async fn folder_info(&self, media_id: i64) -> Result<BiliResponse<FavFolderInfo>, BiliError> {
-        let params = Params::new().push("media_id", media_id.to_string());
+    pub async fn folder_info(
+        &self,
+        media_id: i64,
+    ) -> Result<BiliResponse<FavFolderInfo>, BiliError> {
+        let params = Params::new().push_val("media_id", media_id);
         self.client
             .get("https://api.bilibili.com/x/v3/fav/folder/info", params)
             .await
@@ -44,10 +47,10 @@ impl FavClient {
         rid: Option<i64>,
     ) -> Result<BiliResponse<FavFolderListResult>, BiliError> {
         let mut params = Params::new()
-            .push("up_mid", up_mid.to_string())
-            .push("type", r#type.unwrap_or(2).to_string());
+            .push_val("up_mid", up_mid)
+            .push_val("type", r#type.unwrap_or(2));
         if let Some(r) = rid {
-            params = params.push("rid", r.to_string());
+            params = params.push_val("rid", r);
         }
         self.client
             .get(
@@ -70,12 +73,12 @@ impl FavClient {
         ps: Option<i64>,
         pn: Option<i64>,
     ) -> Result<BiliResponse<FavFolderListResult>, BiliError> {
-        let mut params = Params::new().push("up_mid", up_mid.to_string());
+        let mut params = Params::new().push_val("up_mid", up_mid);
         if let Some(p) = ps {
-            params = params.push("ps", p.to_string());
+            params = params.push_val("ps", p);
         }
         if let Some(p) = pn {
-            params = params.push("pn", p.to_string());
+            params = params.push_val("pn", p);
         }
         self.client
             .get(
@@ -129,19 +132,19 @@ impl FavClient {
         pn: Option<i64>,
         platform: Option<&str>,
     ) -> Result<BiliResponse<FavResourceListResult>, BiliError> {
-        let mut params = Params::new().push("media_id", media_id.to_string());
+        let mut params = Params::new().push_val("media_id", media_id);
         if let Some(t) = tid {
-            params = params.push("tid", t.to_string());
+            params = params.push_val("tid", t);
         }
         if let Some(k) = keyword {
             params = params.push("keyword", k);
         }
         if let Some(t) = r#type {
-            params = params.push("type", t.to_string());
+            params = params.push_val("type", t);
         }
-        params = params.push("ps", ps.unwrap_or(20).to_string());
+        params = params.push_val("ps", ps.unwrap_or(20));
         if let Some(p) = pn {
-            params = params.push("pn", p.to_string());
+            params = params.push_val("pn", p);
         }
         if let Some(p) = platform {
             params = params.push("platform", p);
@@ -162,7 +165,7 @@ impl FavClient {
         media_id: i64,
         platform: Option<&str>,
     ) -> Result<Vec<FavResourceId>, BiliError> {
-        let mut params = Params::new().push("media_id", media_id.to_string());
+        let mut params = Params::new().push_val("media_id", media_id);
         if let Some(p) = platform {
             params = params.push("platform", p);
         }
@@ -193,13 +196,13 @@ impl FavClient {
         let form = FormBuilder::new()
             .push("title", title)
             .push_opt("intro", intro)
-            .push_opt("privacy", privacy.map(|p| p.to_string()))
+            .push_opt_val("privacy", privacy)
             .push_opt("cover", cover)
             .csrf(csrf)
             .build();
 
         self.client
-            .post_required("https://api.bilibili.com/x/v3/fav/folder/add", &form)
+            .post("https://api.bilibili.com/x/v3/fav/folder/add", &form)
             .await
     }
 
@@ -223,16 +226,16 @@ impl FavClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("media_id", media_id.to_string())
+            .push_val("media_id", media_id)
             .push("title", title)
             .push_opt("intro", intro)
-            .push_opt("privacy", privacy.map(|p| p.to_string()))
+            .push_opt_val("privacy", privacy)
             .push_opt("cover", cover)
             .csrf(csrf)
             .build();
 
         self.client
-            .post_required("https://api.bilibili.com/x/v3/fav/folder/edit", &form)
+            .post("https://api.bilibili.com/x/v3/fav/folder/edit", &form)
             .await
     }
 
@@ -241,7 +244,10 @@ impl FavClient {
     /// `POST https://api.bilibili.com/x/v3/fav/folder/del`
     ///
     /// - `media_ids`: 收藏夹 id 列表 (逗号分隔)
-    pub async fn folder_del(&self, media_ids: &str) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
+    pub async fn folder_del(
+        &self,
+        media_ids: &str,
+    ) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
@@ -250,7 +256,7 @@ impl FavClient {
             .build();
 
         self.client
-            .post_required("https://api.bilibili.com/x/v3/fav/folder/del", &form)
+            .post("https://api.bilibili.com/x/v3/fav/folder/del", &form)
             .await
     }
 
@@ -274,16 +280,16 @@ impl FavClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("src_media_id", src_media_id.to_string())
-            .push("tar_media_id", tar_media_id.to_string())
-            .push("mid", mid.to_string())
+            .push_val("src_media_id", src_media_id)
+            .push_val("tar_media_id", tar_media_id)
+            .push_val("mid", mid)
             .push("resources", resources)
             .push_opt("platform", platform)
             .csrf(csrf)
             .build();
 
         self.client
-            .post_required("https://api.bilibili.com/x/v3/fav/resource/copy", &form)
+            .post("https://api.bilibili.com/x/v3/fav/resource/copy", &form)
             .await
     }
 
@@ -307,16 +313,16 @@ impl FavClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("src_media_id", src_media_id.to_string())
-            .push("tar_media_id", tar_media_id.to_string())
-            .push("mid", mid.to_string())
+            .push_val("src_media_id", src_media_id)
+            .push_val("tar_media_id", tar_media_id)
+            .push_val("mid", mid)
             .push("resources", resources)
             .push_opt("platform", platform)
             .csrf(csrf)
             .build();
 
         self.client
-            .post_required("https://api.bilibili.com/x/v3/fav/resource/move", &form)
+            .post("https://api.bilibili.com/x/v3/fav/resource/move", &form)
             .await
     }
 
@@ -336,14 +342,14 @@ impl FavClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("media_id", media_id.to_string())
+            .push_val("media_id", media_id)
             .push("resources", resources)
             .push_opt("platform", platform)
             .csrf(csrf)
             .build();
 
         self.client
-            .post_required(
+            .post(
                 "https://api.bilibili.com/x/v3/fav/resource/batch-del",
                 &form,
             )
@@ -355,16 +361,19 @@ impl FavClient {
     /// `POST https://api.bilibili.com/x/v3/fav/resource/clean`
     ///
     /// - `media_id`: 收藏夹 id
-    pub async fn resource_clean(&self, media_id: i64) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
+    pub async fn resource_clean(
+        &self,
+        media_id: i64,
+    ) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("media_id", media_id.to_string())
+            .push_val("media_id", media_id)
             .csrf(csrf)
             .build();
 
         self.client
-            .post_required("https://api.bilibili.com/x/v3/fav/resource/clean", &form)
+            .post("https://api.bilibili.com/x/v3/fav/resource/clean", &form)
             .await
     }
 
@@ -374,18 +383,22 @@ impl FavClient {
     ///
     /// - `rid`: 视频 avid
     /// - `add_media_ids`: 目标收藏夹 id 列表 (逗号分隔)
-    pub async fn add(&self, rid: i64, add_media_ids: i64) -> Result<BiliResponse<Option<FavDealResult>>, BiliError> {
+    pub async fn add(
+        &self,
+        rid: i64,
+        add_media_ids: i64,
+    ) -> Result<BiliResponse<Option<FavDealResult>>, BiliError> {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("rid", rid.to_string())
+            .push_val("rid", rid)
             .push("type", "2")
-            .push("add_media_ids", add_media_ids.to_string())
+            .push_val("add_media_ids", add_media_ids)
             .csrf(csrf)
             .build();
 
         self.client
-            .post_required("https://api.bilibili.com/x/v3/fav/resource/deal", &form)
+            .post("https://api.bilibili.com/x/v3/fav/resource/deal", &form)
             .await
     }
 
@@ -407,15 +420,15 @@ impl FavClient {
         let csrf = self.client.csrf().await?;
 
         let form = FormBuilder::new()
-            .push("rid", rid.to_string())
-            .push("type", r#type.to_string())
+            .push_val("rid", rid)
+            .push_val("type", r#type)
             .push_opt("add_media_ids", add_media_ids)
             .push_opt("del_media_ids", del_media_ids)
             .csrf(csrf)
             .build();
 
         self.client
-            .post_required("https://api.bilibili.com/x/v3/fav/resource/deal", &form)
+            .post("https://api.bilibili.com/x/v3/fav/resource/deal", &form)
             .await
     }
 
@@ -424,8 +437,11 @@ impl FavClient {
     /// `GET https://api.bilibili.com/x/v2/fav/video/favoured`
     ///
     /// - `aid`: 视频 avid
-    pub async fn has_favorite(&self, aid: i64) -> Result<BiliResponse<FavHasFavoriteResult>, BiliError> {
-        let params = Params::new().push("aid", aid.to_string());
+    pub async fn has_favorite(
+        &self,
+        aid: i64,
+    ) -> Result<BiliResponse<FavHasFavoriteResult>, BiliError> {
+        let params = Params::new().push_val("aid", aid);
         self.client
             .get("https://api.bilibili.com/x/v2/fav/video/favoured", params)
             .await
@@ -436,8 +452,11 @@ impl FavClient {
     /// `GET https://api.bilibili.com/x/v3/fav/folder/created/list-all`
     ///
     /// - `up_mid`: 目标用户 mid
-    pub async fn folder_list(&self, up_mid: i64) -> Result<BiliResponse<FavFolderListResult>, BiliError> {
-        let params = Params::new().push("up_mid", up_mid.to_string());
+    pub async fn folder_list(
+        &self,
+        up_mid: i64,
+    ) -> Result<BiliResponse<FavFolderListResult>, BiliError> {
+        let params = Params::new().push_val("up_mid", up_mid);
         self.client
             .get(
                 "https://api.bilibili.com/x/v3/fav/folder/created/list-all",

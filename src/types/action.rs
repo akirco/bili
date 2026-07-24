@@ -14,6 +14,12 @@ pub struct HasCoinResult {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default, rename_all = "camelCase")]
+pub struct HasLikeResult {
+    pub like: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct TripleResult {
     pub like: bool,
     pub coin: bool,
