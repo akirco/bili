@@ -32,7 +32,7 @@ impl LoginClient {
     ///
     /// `GET https://passport.bilibili.com/x/passport-login/web/qrcode/poll`
     ///
-    /// - `qrcode_key`: 二维码 key (从 qrcode() 返回)
+    /// - `qrcode_key`: 二维码 key (从 `qrcode()` 返回)
     pub async fn qrcode_status(
         &self,
         qrcode_key: &str,

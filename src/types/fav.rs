@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavFolderUpper {
     pub mid: i64,
     pub name: String,
@@ -12,7 +12,7 @@ pub struct FavFolderUpper {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavFolderCntInfo {
     pub collect: i64,
     pub play: i64,
@@ -21,9 +21,11 @@ pub struct FavFolderCntInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavFolderInfo {
+    /// 收藏夹 `media_id`（`fav-items --media-id` 使用此字段）
     pub id: i64,
+    /// 收藏夹短 id（旧版标识，不用于 `media_id` 参数）
     pub fid: i64,
     pub mid: i64,
     pub attr: i64,
@@ -43,14 +45,14 @@ pub struct FavFolderInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavFolderListResult {
     pub count: i64,
     pub list: Vec<FavFolderInfo>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavResourceUpper {
     pub mid: i64,
     pub name: String,
@@ -58,7 +60,7 @@ pub struct FavResourceUpper {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavResourceCntInfo {
     pub collect: i64,
     pub play: i64,
@@ -68,7 +70,7 @@ pub struct FavResourceCntInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavResource {
     pub id: i64,
     pub r#type: i64,
@@ -86,19 +88,22 @@ pub struct FavResource {
     pub fav_time: i64,
     pub bv_id: String,
     pub bvid: String,
+    pub season: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavResourceListResult {
     pub info: FavFolderInfo,
+    /// 空收藏夹或参数错误时接口可能返回 `null`
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub medias: Vec<FavResource>,
     pub has_more: bool,
     pub ttl: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavResourceId {
     pub id: i64,
     pub r#type: i64,
@@ -107,20 +112,20 @@ pub struct FavResourceId {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavDealResult {
     pub prompt: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct FavHasFavoriteResult {
     pub count: i64,
     pub favoured: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct EmptyDataResult {
     pub data: i64,
 }

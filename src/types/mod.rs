@@ -21,3 +21,14 @@ pub use search::*;
 pub use subtitle::*;
 pub use user::*;
 pub use video::*;
+
+/// Treat JSON `null` like a missing field when a `Vec`/map field is declared
+/// as non-optional (B 站在空列表场景下偶尔返回 `null`）。
+pub(crate) fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Default + serde::Deserialize<'de>,
+{
+    use serde::Deserialize;
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
+}

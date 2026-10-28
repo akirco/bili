@@ -76,7 +76,12 @@ impl UserClient {
     }
 
     /// 获取当前登录用户的 UID
-    pub async fn get_current_uid(&self) -> Result<i64, BiliError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BiliError::CookieBuild`] if the store lock is poisoned, or
+    /// [`BiliError::Parse`] if `DedeUserID` is missing or not an integer.
+    pub fn get_current_uid(&self) -> Result<i64, BiliError> {
         let uid = self
             .client
             .inner
@@ -94,11 +99,8 @@ impl UserClient {
     /// `POST https://api.bilibili.com/x/relation/modify`
     ///
     /// - `fid`: 目标用户 mid
-    pub async fn follow(
-        &self,
-        fid: i64,
-    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    pub async fn follow(&self, fid: i64) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+        let csrf = self.client.csrf()?;
         let form = FormBuilder::new()
             .push_val("fid", fid)
             .push("act", "1")
@@ -114,11 +116,8 @@ impl UserClient {
     /// `POST https://api.bilibili.com/x/relation/modify`
     ///
     /// - `fid`: 目标用户 mid
-    pub async fn unfollow(
-        &self,
-        fid: i64,
-    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    pub async fn unfollow(&self, fid: i64) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+        let csrf = self.client.csrf()?;
         let form = FormBuilder::new()
             .push_val("fid", fid)
             .push("act", "2")
@@ -137,8 +136,8 @@ impl UserClient {
     pub async fn remove_follower(
         &self,
         fid: i64,
-    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+        let csrf = self.client.csrf()?;
         let form = FormBuilder::new()
             .push_val("fid", fid)
             .push("act", "7")
@@ -159,11 +158,11 @@ impl UserClient {
     pub async fn batch_follow(
         &self,
         fids: &[i64],
-    ) -> Result<BiliResponse<Option<BatchModifyResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<BatchModifyResult>, BiliError> {
+        let csrf = self.client.csrf()?;
         let fids_str = fids
             .iter()
-            .map(|f| f.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(",");
         let form = FormBuilder::new()
@@ -186,11 +185,11 @@ impl UserClient {
     pub async fn batch_block(
         &self,
         fids: &[i64],
-    ) -> Result<BiliResponse<Option<BatchModifyResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<BatchModifyResult>, BiliError> {
+        let csrf = self.client.csrf()?;
         let fids_str = fids
             .iter()
-            .map(|f| f.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(",");
         let form = FormBuilder::new()

@@ -27,8 +27,8 @@ impl ActionClient {
         aid: i64,
         multiply: Option<i64>,
         select_like: Option<bool>,
-    ) -> Result<BiliResponse<Option<CoinResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<CoinResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("aid", aid)
@@ -70,8 +70,8 @@ impl ActionClient {
         &self,
         aid: i64,
         like: bool,
-    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+        let csrf = self.client.csrf()?;
         let like_val = if like { "1" } else { "2" };
 
         let form = FormBuilder::new()
@@ -108,8 +108,8 @@ impl ActionClient {
     /// `POST https://api.bilibili.com/x/web-interface/archive/like/triple`
     ///
     /// - `aid`: 稿件 avid
-    pub async fn triple(&self, aid: i64) -> Result<BiliResponse<Option<TripleResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    pub async fn triple(&self, aid: i64) -> Result<BiliResponse<TripleResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new().push_val("aid", aid).csrf(csrf).build();
 

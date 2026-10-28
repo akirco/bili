@@ -21,8 +21,7 @@ impl DanmakuClient {
     /// Returns parsed `DanmakuElem` entries.
     pub async fn seg(&self, cid: i64, segment_index: i64) -> Result<Vec<DanmakuElem>, BiliError> {
         let url = format!(
-            "https://api.bilibili.com/x/v2/dm/web/seg.so?type=1&oid={}&segment_index={}",
-            cid, segment_index
+            "https://api.bilibili.com/x/v2/dm/web/seg.so?type=1&oid={cid}&segment_index={segment_index}"
         );
         let bytes = self.client.get_bytes(&url).await?;
         Ok(parse_seg_so(&bytes))
@@ -37,13 +36,62 @@ impl DanmakuClient {
         cid: i64,
         max_segments: i64,
     ) -> Result<Vec<DanmakuElem>, BiliError> {
+        /// Segments fetched concurrently per batch.
+        const BATCH: i64 = 4;
+
         let mut all = Vec::new();
-        for seg in 1..=max_segments {
-            let elems = self.seg(cid, seg).await?;
-            if elems.is_empty() {
+        let mut start = 1;
+        while start <= max_segments {
+            let end = (start + BATCH - 1).min(max_segments);
+
+            let mut set = tokio::task::JoinSet::new();
+            for seg in start..=end {
+                let client = self.clone();
+                set.spawn(async move { (seg, client.seg(cid, seg).await) });
+            }
+
+            let mut by_seg: std::collections::BTreeMap<i64, Vec<DanmakuElem>> =
+                std::collections::BTreeMap::new();
+            let mut first_error = None;
+            while let Some(joined) = set.join_next().await {
+                match joined {
+                    Ok((seg, Ok(elems))) => {
+                        by_seg.insert(seg, elems);
+                    }
+                    Ok((_, Err(e))) => {
+                        first_error.get_or_insert(e);
+                    }
+                    Err(e) => {
+                        first_error.get_or_insert_with(|| {
+                            BiliError::Parse(format!("danmaku task failed: {e}"))
+                        });
+                    }
+                }
+            }
+            if let Some(e) = first_error {
+                return Err(e);
+            }
+
+            let mut hit_empty_segment = false;
+            for seg in start..=end {
+                match by_seg.remove(&seg) {
+                    Some(elems) if elems.is_empty() => {
+                        // Don't discard non-empty later segments in this batch:
+                        // an empty segment can be a gap, not necessarily the end.
+                        hit_empty_segment = true;
+                    }
+                    Some(elems) => all.extend(elems),
+                    None => {}
+                }
+            }
+            if hit_empty_segment {
                 break;
             }
-            all.extend(elems);
+            start = end + 1;
+            if start <= max_segments {
+                // Be gentle with Bilibili's rate limiting on long videos.
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
         }
         Ok(all)
     }
@@ -87,8 +135,8 @@ impl DanmakuClient {
         progress: i64,
         aid: Option<i64>,
         bvid: Option<&str>,
-    ) -> Result<BiliResponse<Option<DanmakuSendResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<DanmakuSendResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let mut form = FormBuilder::new()
             .push("type", "1")
@@ -123,8 +171,8 @@ impl DanmakuClient {
         &self,
         dmid: i64,
         cid: i64,
-    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("dmid", dmid)
@@ -150,7 +198,7 @@ fn decode_varint(data: &[u8], offset: &mut usize) -> Option<u64> {
         }
         let byte = data[*offset];
         *offset += 1;
-        result |= ((byte & 0x7F) as u64) << shift;
+        result |= u64::from(byte & 0x7F) << shift;
         if byte & 0x80 == 0 {
             break;
         }
@@ -162,27 +210,53 @@ fn decode_varint(data: &[u8], offset: &mut usize) -> Option<u64> {
     Some(result)
 }
 
+/// Decode a varint and convert it to `T`, returning `None` if the value does
+/// not fit in `T`.
+fn cast_varint<T: TryFrom<u64>>(data: &[u8], offset: &mut usize) -> Option<T> {
+    T::try_from(decode_varint(data, offset)?).ok()
+}
+
 fn skip_field(wire_type: u64, data: &[u8], offset: &mut usize) -> bool {
     match wire_type {
         0 => decode_varint(data, offset).is_some(),
-        1 => {
-            *offset += 8;
-            *offset <= data.len()
-        }
+        1 => advance(offset, 8, data.len()),
         2 => {
-            if let Some(len) = decode_varint(data, offset) {
-                *offset += len as usize;
-                *offset <= data.len()
-            } else {
-                false
-            }
+            let Some(len) = decode_varint(data, offset) else {
+                return false;
+            };
+            let Ok(len) = usize::try_from(len) else {
+                return false;
+            };
+            advance(offset, len, data.len())
         }
-        5 => {
-            *offset += 4;
-            *offset <= data.len()
+        5 => advance(offset, 4, data.len()),
+        _ => false,
+    }
+}
+
+/// Advance `*offset` by `len`, returning `false` on overflow or out-of-bounds.
+fn advance(offset: &mut usize, len: usize, data_len: usize) -> bool {
+    match offset.checked_add(len) {
+        Some(end) if end <= data_len => {
+            *offset = end;
+            true
         }
         _ => false,
     }
+}
+
+/// Read a length-delimited UTF-8 string, advancing `*offset` to the end of the
+/// field. Returns `None` on truncated or out-of-range input.
+fn read_string(data: &[u8], offset: &mut usize) -> Option<String> {
+    let len = decode_varint(data, offset)?;
+    let len = usize::try_from(len).ok()?;
+    let end = offset.checked_add(len)?;
+    if end > data.len() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&data[*offset..end]).to_string();
+    *offset = end;
+    Some(s)
 }
 
 fn parse_seg_so(data: &[u8]) -> Vec<DanmakuElem> {
@@ -199,7 +273,12 @@ fn parse_seg_so(data: &[u8]) -> Vec<DanmakuElem> {
             let Some(len) = decode_varint(data, &mut offset) else {
                 break;
             };
-            let end = offset + (len as usize);
+            let Ok(len) = usize::try_from(len) else {
+                break;
+            };
+            let Some(end) = offset.checked_add(len) else {
+                break;
+            };
             if end > data.len() {
                 break;
             }
@@ -220,7 +299,7 @@ fn parse_dm_elem(data: &[u8]) -> Option<DanmakuElem> {
     let mut progress = 0i64;
     let mut mode = 1i32;
     let mut fontsize = 25i32;
-    let mut color = 0xFFFFFFu32;
+    let mut color = 0x00FF_FFFFu32;
     let mut mid_hash = 0u64;
     let mut content = String::new();
     let mut weight = 0i64;
@@ -236,35 +315,26 @@ fn parse_dm_elem(data: &[u8]) -> Option<DanmakuElem> {
         let field_number = key >> 3;
 
         match (field_number, wire_type) {
-            (1, 0) => id = decode_varint(data, &mut offset).unwrap_or(0) as i64,
-            (2, 0) => progress = decode_varint(data, &mut offset).unwrap_or(0) as i64,
-            (3, 0) => mode = decode_varint(data, &mut offset).unwrap_or(1) as i32,
-            (4, 0) => fontsize = decode_varint(data, &mut offset).unwrap_or(25) as i32,
-            (5, 0) => color = decode_varint(data, &mut offset).unwrap_or(0xFFFFFF) as u32,
+            (1, 0) => id = cast_varint::<i64>(data, &mut offset).unwrap_or(0),
+            (2, 0) => progress = cast_varint::<i64>(data, &mut offset).unwrap_or(0),
+            (3, 0) => mode = cast_varint::<i32>(data, &mut offset).unwrap_or(1),
+            (4, 0) => fontsize = cast_varint::<i32>(data, &mut offset).unwrap_or(25),
+            (5, 0) => color = cast_varint::<u32>(data, &mut offset).unwrap_or(0x00FF_FFFF),
             (6, 0) => mid_hash = decode_varint(data, &mut offset).unwrap_or(0),
-            (7, 2) => {
-                let len = decode_varint(data, &mut offset).unwrap_or(0) as usize;
-                if offset + len <= data.len() {
-                    content = String::from_utf8_lossy(&data[offset..offset + len]).to_string();
-                }
-                offset += len;
-            }
-            (9, 0) => weight = decode_varint(data, &mut offset).unwrap_or(0) as i64,
-            (12, 2) => {
-                let len = decode_varint(data, &mut offset).unwrap_or(0) as usize;
-                if offset + len <= data.len() {
-                    action = String::from_utf8_lossy(&data[offset..offset + len]).to_string();
-                }
-                offset += len;
-            }
-            (13, 0) => pool = decode_varint(data, &mut offset).unwrap_or(0) as i64,
-            (15, 2) => {
-                let len = decode_varint(data, &mut offset).unwrap_or(0) as usize;
-                if offset + len <= data.len() {
-                    id_str = String::from_utf8_lossy(&data[offset..offset + len]).to_string();
-                }
-                offset += len;
-            }
+            (7, 2) => match read_string(data, &mut offset) {
+                Some(s) => content = s,
+                None => break,
+            },
+            (9, 0) => weight = cast_varint::<i64>(data, &mut offset).unwrap_or(0),
+            (12, 2) => match read_string(data, &mut offset) {
+                Some(s) => action = s,
+                None => break,
+            },
+            (13, 0) => pool = cast_varint::<i64>(data, &mut offset).unwrap_or(0),
+            (15, 2) => match read_string(data, &mut offset) {
+                Some(s) => id_str = s,
+                None => break,
+            },
             _ => {
                 if !skip_field(wire_type, data, &mut offset) {
                     break;
@@ -409,7 +479,7 @@ mod tests {
         assert_eq!(elem.progress, 1000);
         assert_eq!(elem.mode, 1);
         assert_eq!(elem.fontsize, 25);
-        assert_eq!(elem.color, 0xFFFFFF);
+        assert_eq!(elem.color, 0x00FF_FFFF);
         assert_eq!(elem.mid_hash, 0);
         assert_eq!(elem.content, "test");
         assert_eq!(elem.weight, 0);
@@ -443,10 +513,10 @@ mod tests {
         let mut data = Vec::new();
         // outer field 1, length-delimited
         data.push(0x0A);
-        data.push(inner1.len() as u8);
+        data.push(u8::try_from(inner1.len()).unwrap());
         data.extend_from_slice(&inner1);
         data.push(0x0A);
-        data.push(inner2.len() as u8);
+        data.push(u8::try_from(inner2.len()).unwrap());
         data.extend_from_slice(&inner2);
 
         let elems = parse_seg_so(&data);

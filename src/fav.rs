@@ -190,8 +190,8 @@ impl FavClient {
         intro: Option<&str>,
         privacy: Option<i64>,
         cover: Option<&str>,
-    ) -> Result<BiliResponse<Option<FavFolderInfo>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<FavFolderInfo>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push("title", title)
@@ -222,8 +222,8 @@ impl FavClient {
         intro: Option<&str>,
         privacy: Option<i64>,
         cover: Option<&str>,
-    ) -> Result<BiliResponse<Option<FavFolderInfo>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<FavFolderInfo>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("media_id", media_id)
@@ -247,8 +247,8 @@ impl FavClient {
     pub async fn folder_del(
         &self,
         media_ids: &str,
-    ) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<EmptyDataResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push("media_ids", media_ids)
@@ -276,8 +276,8 @@ impl FavClient {
         mid: i64,
         resources: &str,
         platform: Option<&str>,
-    ) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<EmptyDataResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("src_media_id", src_media_id)
@@ -309,8 +309,8 @@ impl FavClient {
         mid: i64,
         resources: &str,
         platform: Option<&str>,
-    ) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<EmptyDataResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("src_media_id", src_media_id)
@@ -338,8 +338,8 @@ impl FavClient {
         media_id: i64,
         resources: &str,
         platform: Option<&str>,
-    ) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<EmptyDataResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("media_id", media_id)
@@ -364,8 +364,8 @@ impl FavClient {
     pub async fn resource_clean(
         &self,
         media_id: i64,
-    ) -> Result<BiliResponse<Option<EmptyDataResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<EmptyDataResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("media_id", media_id)
@@ -387,8 +387,8 @@ impl FavClient {
         &self,
         rid: i64,
         add_media_ids: i64,
-    ) -> Result<BiliResponse<Option<FavDealResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<FavDealResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("rid", rid)
@@ -416,8 +416,8 @@ impl FavClient {
         r#type: i64,
         add_media_ids: Option<&str>,
         del_media_ids: Option<&str>,
-    ) -> Result<BiliResponse<Option<FavDealResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<FavDealResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("rid", rid)

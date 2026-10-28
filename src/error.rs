@@ -23,6 +23,12 @@ pub enum BiliError {
     #[error("CSRF token not found")]
     CsrfNotFound,
 
+    /// Bilibili 风控/限流（HTTP 412 或 429）
+    #[error(
+        "Bilibili rate limited or risk-controlled (HTTP 412/429); retry later or supply a full cookie (including buvid3)"
+    )]
+    RateLimited,
+
     /// Parse error
     #[error("Parse error: {0}")]
     Parse(String),

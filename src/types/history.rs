@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::video::{VideoDimension, VideoOwner, VideoPage, VideoRights, VideoStat};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct HistoryItem {
     pub title: String,
     pub long_title: String,
@@ -31,7 +31,7 @@ pub struct HistoryItem {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct HistoryItemHistory {
     pub oid: i64,
     pub epid: i64,
@@ -44,7 +44,7 @@ pub struct HistoryItemHistory {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct HistoryTab {
     #[serde(rename = "type")]
     pub tab_type: String,
@@ -52,7 +52,7 @@ pub struct HistoryTab {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct HistoryCursor {
     pub max: i64,
     pub view_at: i64,
@@ -61,7 +61,7 @@ pub struct HistoryCursor {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct HistoryResult {
     pub list: Vec<HistoryItem>,
     pub has_more: bool,
@@ -72,7 +72,7 @@ pub struct HistoryResult {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct ToviewItem {
     pub aid: i64,
     pub videos: i64,
@@ -100,7 +100,7 @@ pub struct ToviewItem {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct ToviewResult {
     pub count: i64,
     pub list: Vec<ToviewItem>,

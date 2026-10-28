@@ -55,14 +55,14 @@ impl SearchClient {
     /// - `page_size`: 每页项数 (默认20)
     /// - `search_type`: 搜索目标类型
     ///   - video: 视频
-    ///   - media_bangumi: 番剧
-    ///   - media_ft: 影视
+    ///   - `media_bangumi`: 番剧
+    ///   - `media_ft`: 影视
     ///   - live: 直播间及主播
-    ///   - live_room: 直播间
-    ///   - live_user: 主播
+    ///   - `live_room`: 直播间
+    ///   - `live_user`: 主播
     ///   - article: 专栏
     ///   - topic: 话题
-    ///   - bili_user: 用户
+    ///   - `bili_user`: 用户
     ///   - photo: 相簿
     pub async fn query(
         &self,
@@ -92,7 +92,7 @@ impl SearchClient {
 
     /// 搜索用户
     ///
-    /// `GET https://api.bilibili.com/x/web-interface/wbi/search/type` (search_type=bili_user)
+    /// `GET https://api.bilibili.com/x/web-interface/wbi/search/type` (`search_type=bili_user`)
     ///
     /// - `keyword`: 需要搜索的关键词
     /// - `page`: 页码

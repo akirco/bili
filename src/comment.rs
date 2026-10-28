@@ -15,9 +15,12 @@ impl CommentClient {
         }
     }
 
-    /// 获取评论列表
+    /// 获取评论列表（旧接口，已废弃）
     ///
     /// `GET https://api.bilibili.com/x/v2/reply/main`
+    ///
+    /// B 站已改用 [`Self::list_wbi`]；该旧接口目前可能返回空数据或 412，
+    /// 保留仅为兼容旧调用方。
     ///
     /// - `comment_type`: 评论区类型 (1=视频, 11=图文, 17=动态)
     /// - `oid`: 目标对象 id (视频为 avid)
@@ -90,8 +93,8 @@ impl CommentClient {
         root: Option<i64>,
         parent: Option<i64>,
         plat: Option<i64>,
-    ) -> Result<BiliResponse<Option<CommentAddResult>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<CommentAddResult>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("type", comment_type)
@@ -122,8 +125,8 @@ impl CommentClient {
         oid: i64,
         rpid: i64,
         action: Option<i64>,
-    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("type", comment_type)
@@ -152,8 +155,8 @@ impl CommentClient {
         oid: i64,
         rpid: i64,
         action: Option<i64>,
-    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("type", comment_type)
@@ -180,8 +183,8 @@ impl CommentClient {
         comment_type: i64,
         oid: i64,
         rpid: i64,
-    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("type", comment_type)
@@ -209,8 +212,8 @@ impl CommentClient {
         oid: i64,
         rpid: i64,
         action: Option<i64>,
-    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("type", comment_type)
@@ -241,8 +244,8 @@ impl CommentClient {
         rpid: i64,
         reason: i64,
         content: Option<&str>,
-    ) -> Result<BiliResponse<Option<serde_json::Value>>, BiliError> {
-        let csrf = self.client.csrf().await?;
+    ) -> Result<BiliResponse<serde_json::Value>, BiliError> {
+        let csrf = self.client.csrf()?;
 
         let form = FormBuilder::new()
             .push_val("type", comment_type)

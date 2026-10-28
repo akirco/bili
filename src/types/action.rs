@@ -1,25 +1,25 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CoinResult {
     pub like: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct HasCoinResult {
     pub multiply: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct HasLikeResult {
     pub like: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct TripleResult {
     pub like: bool,
     pub coin: bool,

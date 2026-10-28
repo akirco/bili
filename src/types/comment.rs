@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentPage {
     pub num: i64,
     pub size: i64,
@@ -10,7 +10,7 @@ pub struct CommentPage {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentConfig {
     pub showadmin: i64,
     pub showentry: i64,
@@ -22,7 +22,7 @@ pub struct CommentConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentLevelInfo {
     pub current_level: i64,
     pub current_min: i64,
@@ -31,7 +31,7 @@ pub struct CommentLevelInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentMemberPendant {
     pub pid: i64,
     pub name: String,
@@ -43,7 +43,7 @@ pub struct CommentMemberPendant {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentMemberNameplate {
     pub nid: i64,
     pub name: String,
@@ -54,14 +54,14 @@ pub struct CommentMemberNameplate {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentMemberOfficialVerify {
     pub r#type: i64,
     pub desc: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentMemberVipLabel {
     pub path: String,
     pub text: String,
@@ -78,16 +78,21 @@ pub struct CommentMemberVipLabel {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentMemberVip {
-    #[serde(default)]
+    #[serde(rename = "vipType")]
     pub vip_type: i64,
-    #[serde(default)]
+    #[serde(rename = "vipDueDate")]
     pub vip_due_date: i64,
+    #[serde(rename = "dueRemark")]
     pub due_remark: String,
+    #[serde(rename = "accessStatus")]
     pub access_status: i64,
+    #[serde(rename = "vipStatus")]
     pub vip_status: i64,
+    #[serde(rename = "vipStatusWarn")]
     pub vip_status_warn: String,
+    #[serde(rename = "themeType")]
     pub theme_type: i64,
     pub label: CommentMemberVipLabel,
     pub avatar_subscript: i64,
@@ -96,7 +101,7 @@ pub struct CommentMemberVip {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentMember {
     pub mid: String,
     pub uname: String,
@@ -104,17 +109,25 @@ pub struct CommentMember {
     pub sign: String,
     pub avatar: String,
     pub rank: String,
+    /// 接口字段名是 `DisplayRank`（大写 D）。
+    #[serde(rename = "DisplayRank", alias = "display_rank")]
     pub display_rank: String,
     pub face_nft_new: i64,
     pub is_senior_member: i64,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub level_info: CommentLevelInfo,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub pendant: CommentMemberPendant,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub nameplate: CommentMemberNameplate,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub official_verify: CommentMemberOfficialVerify,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub vip: CommentMemberVip,
     pub fans_detail: Option<serde_json::Value>,
     pub following: i64,
     pub is_followed: i64,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub user_sailing: CommentUserSailing,
     pub is_contractor: bool,
     pub contract_desc: String,
@@ -122,7 +135,7 @@ pub struct CommentMember {
 
 /// 评论者装扮信息
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentUserSailing {
     pub pendant: Option<CommentUserSailingItem>,
     pub cardbg: Option<CommentUserSailingCard>,
@@ -130,7 +143,7 @@ pub struct CommentUserSailing {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentUserSailingItem {
     pub id: i64,
     pub name: String,
@@ -142,7 +155,7 @@ pub struct CommentUserSailingItem {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentUserSailingCard {
     pub id: i64,
     pub name: String,
@@ -153,7 +166,7 @@ pub struct CommentUserSailingCard {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentUserSailingFan {
     pub is_fan: i64,
     pub number: i64,
@@ -163,13 +176,13 @@ pub struct CommentUserSailingFan {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentContentEmoteMeta {
     pub size: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentContentEmote {
     pub id: i64,
     pub package_id: i64,
@@ -184,20 +197,21 @@ pub struct CommentContentEmote {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentContent {
     pub message: String,
     pub plat: i64,
     pub device: String,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub members: Vec<CommentContentMember>,
     pub emote: Option<std::collections::HashMap<String, CommentContentEmote>>,
-    pub jump_url: std::collections::HashMap<String, String>,
+    pub jump_url: serde_json::Value,
     pub max_line: i64,
 }
 
 /// @某人的信息
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentContentMember {
     pub mid: String,
     pub uname: String,
@@ -205,7 +219,7 @@ pub struct CommentContentMember {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentReplyFolder {
     pub has_folded: bool,
     pub is_folded: bool,
@@ -213,20 +227,20 @@ pub struct CommentReplyFolder {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentUpAction {
     pub like: bool,
     pub reply: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentReplyControl {
     pub time_desc: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentReply {
     pub rpid: i64,
     pub oid: i64,
@@ -250,6 +264,7 @@ pub struct CommentReply {
     pub action: i64,
     pub member: CommentMember,
     pub content: CommentContent,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub replies: Vec<CommentReply>,
     pub assist: i64,
     pub folder: CommentReplyFolder,
@@ -265,7 +280,7 @@ pub struct CommentReply {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentUpper {
     pub mid: i64,
     pub top: Option<CommentReply>,
@@ -274,7 +289,7 @@ pub struct CommentUpper {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentNotice {
     pub content: String,
     pub id: i64,
@@ -283,7 +298,7 @@ pub struct CommentNotice {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentFolder {
     pub has_folded: bool,
     pub is_folded: bool,
@@ -291,7 +306,7 @@ pub struct CommentFolder {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentControl {
     pub input_disable: bool,
     pub root_input_text: String,
@@ -313,14 +328,14 @@ pub struct CommentControl {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentCursorPagination {
     pub next_offset: String,
     pub prev_offset: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentCursor {
     pub all_count: i64,
     pub is_begin: bool,
@@ -328,14 +343,16 @@ pub struct CommentCursor {
     pub next: i64,
     pub is_end: bool,
     pub mode: i64,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub support_mode: Vec<i64>,
     pub name: String,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub pagination_reply: CommentCursorPagination,
     pub session_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentList {
     pub page: CommentPage,
     pub config: CommentConfig,
@@ -348,6 +365,7 @@ pub struct CommentList {
     pub blacklist: i64,
     pub assist: i64,
     pub mode: i64,
+    #[serde(default, deserialize_with = "super::null_as_default")]
     pub support_mode: Vec<i64>,
     pub folder: CommentFolder,
     #[serde(default)]
@@ -357,7 +375,7 @@ pub struct CommentList {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentListWbi {
     pub cursor: CommentCursor,
     pub hots: Option<Vec<CommentReply>>,
@@ -396,7 +414,7 @@ pub struct CommentListWbi {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct CommentAddResult {
     pub success_action: i64,
     pub success_toast: String,

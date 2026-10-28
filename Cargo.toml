@@ -2,6 +2,13 @@
 name = "bili"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.91"
+description = "Bilibili API client library and CLI"
+readme = "README.md"
+repository = "https://github.com/akirco/bili"
+license = "MIT"
+keywords = ["api", "bilibili", "cli", "danmaku"]
+categories = ["api-bindings", "command-line-utilities"]
 
 [lib]
 name = "bili"
@@ -29,10 +36,7 @@ reqwest = {
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 thiserror = "2.0.19"
-tokio = {
-  version = "1.53.1",
-  features = ["fs", "io-util", "macros", "rt-multi-thread", "sync", "time"]
-}
+tokio = { version = "1.53.1", features = ["fs", "io-util", "macros", "process", "rt-multi-thread", "sync", "time"] }
 
 # CLI dependencies (only compiled with `cli` feature)
 clap = { version = "4.6.4", features = ["derive"], optional = true }
@@ -40,41 +44,13 @@ clap_complete = { version = "4.6.7", optional = true }
 qrcode = { version = "0.14.1", default-features = false, optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.53.1", features = ["macros", "rt"] }
+wiremock = "0.6"
 
 [features]
-default = [
-  "action",
-  "audio",
-  "cli",
-  "comment",
-  "danmaku",
-  "fav",
-  "history",
-  "login",
-  "search",
-  "subtitle",
-  "user",
-  "video"
-]
+default = ["action", "audio", "cli", "comment", "danmaku", "fav", "history", "login", "search", "subtitle", "user", "video"]
 action = []
 audio = []
-cli = [
-  "action",
-  "audio",
-  "comment",
-  "danmaku",
-  "dep:clap",
-  "dep:clap_complete",
-  "dep:qrcode",
-  "fav",
-  "history",
-  "login",
-  "search",
-  "subtitle",
-  "user",
-  "video"
-]
+cli = ["action", "audio", "comment", "danmaku", "dep:clap", "dep:clap_complete", "dep:qrcode", "fav", "history", "login", "search", "subtitle", "user", "video"]
 comment = []
 danmaku = []
 fav = []
@@ -85,6 +61,19 @@ subtitle = []
 user = []
 video = []
 
+[lints.clippy]
+# Public API docs already describe parameters/endpoints; error sections are
+# intentionally waived to avoid boilerplate on every wrapper method.
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+pedantic = { level = "warn", priority = -1 }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+# The release profile below is applied when this package is built as the root
+# (e.g. `cargo install`). `panic = "abort"` only affects the shipped binary;
+# it is ignored when the crate is consumed as a dependency.
 [profile.release]
 opt-level = "s"
 strip = true

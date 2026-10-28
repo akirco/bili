@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchVideo {
     pub r#type: String,
     pub id: i64,
@@ -33,14 +33,14 @@ pub struct SearchVideo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchMediaScore {
     pub user_count: i64,
     pub score: f64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchMediaDisplayInfo {
     pub bg_color_night: String,
     pub text: String,
@@ -53,7 +53,7 @@ pub struct SearchMediaDisplayInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchMediaBadge {
     pub text: String,
     pub text_color: String,
@@ -66,7 +66,7 @@ pub struct SearchMediaBadge {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchMediaEp {
     pub id: i64,
     pub cover: String,
@@ -79,7 +79,7 @@ pub struct SearchMediaEp {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchMedia {
     pub r#type: String,
     pub media_id: i64,
@@ -120,7 +120,7 @@ pub struct SearchMedia {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchLiveRoom {
     pub rank_offset: i64,
     pub uid: i64,
@@ -145,7 +145,7 @@ pub struct SearchLiveRoom {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchLiveUser {
     pub rank_offset: i64,
     pub uid: i64,
@@ -165,7 +165,7 @@ pub struct SearchLiveUser {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchArticle {
     pub pub_time: i64,
     pub like: i64,
@@ -186,7 +186,7 @@ pub struct SearchArticle {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchTopic {
     pub description: String,
     pub pubdate: i64,
@@ -209,7 +209,7 @@ pub struct SearchTopic {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchUserResVideo {
     pub aid: i64,
     pub bvid: String,
@@ -228,14 +228,14 @@ pub struct SearchUserResVideo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchUserOfficialVerify {
     pub r#type: i64,
     pub desc: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchUser {
     pub r#type: String,
     pub mid: i64,
@@ -256,7 +256,7 @@ pub struct SearchUser {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchPhoto {
     pub count: i64,
     pub like: i64,
@@ -273,32 +273,51 @@ pub struct SearchPhoto {
     pub rank_score: i64,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "type")]
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
 pub enum SearchResultItem {
-    #[serde(rename = "video")]
     Video(SearchVideo),
-    #[serde(rename = "media_bangumi")]
     MediaBangumi(SearchMedia),
-    #[serde(rename = "media_ft")]
     MediaFt(SearchMedia),
-    #[serde(rename = "live_room")]
     LiveRoom(SearchLiveRoom),
-    #[serde(rename = "live_user")]
     LiveUser(SearchLiveUser),
-    #[serde(rename = "article")]
     Article(SearchArticle),
-    #[serde(rename = "topic")]
     Topic(SearchTopic),
-    #[serde(rename = "bili_user")]
     BiliUser(SearchUser),
-    #[serde(rename = "photo")]
     Photo(SearchPhoto),
+    /// Result types added by Bilibili after this crate was written. Kept as
+    /// raw JSON instead of failing the whole response.
+    Other(serde_json::Value),
+}
+
+impl<'de> serde::Deserialize<'de> for SearchResultItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let kind = value
+            .get("type")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default();
+        let parsed = match kind {
+            "video" => serde_json::from_value(value).map(Self::Video),
+            "media_bangumi" => serde_json::from_value(value).map(Self::MediaBangumi),
+            "media_ft" => serde_json::from_value(value).map(Self::MediaFt),
+            "live_room" => serde_json::from_value(value).map(Self::LiveRoom),
+            "live_user" => serde_json::from_value(value).map(Self::LiveUser),
+            "article" => serde_json::from_value(value).map(Self::Article),
+            "topic" => serde_json::from_value(value).map(Self::Topic),
+            "bili_user" => serde_json::from_value(value).map(Self::BiliUser),
+            "photo" => serde_json::from_value(value).map(Self::Photo),
+            _ => return Ok(Self::Other(value)),
+        };
+        parsed.map_err(serde::de::Error::custom)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchHotWordItem {
     pub status: String,
     pub hot_id: i64,
@@ -317,7 +336,7 @@ pub struct SearchHotWordItem {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchHotWordResult {
     pub exp_str: String,
     pub cost: serde_json::Value,
@@ -327,7 +346,7 @@ pub struct SearchHotWordResult {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchSquareTrendingItem {
     pub keyword: String,
     pub show_name: String,
@@ -337,7 +356,7 @@ pub struct SearchSquareTrendingItem {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchSquareTrending {
     pub title: String,
     pub trackid: String,
@@ -346,18 +365,21 @@ pub struct SearchSquareTrending {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchSquareResult {
     pub trending: SearchSquareTrending,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchAllResult {
     pub seid: String,
     pub page: i64,
-    pub page_size: i64,
+    /// 接口字段名是小写的 `pagesize`
+    pub pagesize: i64,
+    #[serde(rename = "numResults")]
     pub num_results: i64,
+    #[serde(rename = "numPages")]
     pub num_pages: i64,
     pub suggest_keyword: String,
     pub rqt_type: String,
@@ -375,12 +397,14 @@ pub struct SearchAllResult {
 
 /// 分类搜索 API 响应
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct SearchTypeResult {
     pub seid: String,
     pub page: i64,
     pub pagesize: i64,
+    #[serde(rename = "numResults")]
     pub num_results: i64,
+    #[serde(rename = "numPages")]
     pub num_pages: i64,
     pub suggest_keyword: String,
     pub rqt_type: String,

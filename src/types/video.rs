@@ -125,6 +125,11 @@ pub struct VideoSubtitleList {
 #[serde(default)]
 pub struct VideoSubtitle {
     pub allow_submit: bool,
+    /// 语言的默认信息
+    pub lan: String,
+    pub lan_doc: String,
+    /// 字幕列表（接口字段名为 `subtitles`）
+    #[serde(rename = "subtitles")]
     pub list: Vec<VideoSubtitleList>,
 }
 
@@ -208,6 +213,7 @@ pub struct VideoUserGarb {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default)]
+#[allow(clippy::struct_excessive_bools)] // mirrors the upstream API shape
 pub struct VideoInfo {
     pub bvid: String,
     pub aid: i64,
@@ -235,7 +241,7 @@ pub struct VideoInfo {
     pub dynamic: String,
     pub cid: i64,
     pub dimension: VideoDimension,
-    pub premiere: Option<()>,
+    pub premiere: Option<serde_json::Value>,
     pub teenage_mode: i64,
     pub is_chargeable_season: bool,
     pub is_story: bool,
@@ -257,6 +263,28 @@ pub struct VideoInfo {
     pub enable_vt: Option<i64>,
     pub vt_display: Option<String>,
     pub is_upower_exclusive_with_qa: Option<bool>,
+}
+
+/// 视频标识，由 [`crate::BiliClient::resolve_video_ids`] 返回。
+///
+/// `cid` 为第一个分P 的 cid；多P 视频可用 [`VideoIds::cid_of_page`] 获取其它分P。
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct VideoIds {
+    /// 稿件 avid
+    pub aid: i64,
+    /// 第一个分P 的 cid
+    pub cid: i64,
+    /// 全部分P
+    pub pages: Vec<VideoPage>,
+}
+
+impl VideoIds {
+    /// 获取指定分P（从 1 开始）的 cid。
+    #[must_use]
+    pub fn cid_of_page(&self, page: i64) -> Option<i64> {
+        self.pages.iter().find(|p| p.page == page).map(|p| p.cid)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -301,26 +329,28 @@ pub struct VideoRecommendItem {
     pub cid: i64,
     pub title: String,
     pub pic: String,
-    pub url: String,
-    pub play: i64,
-    pub danmaku: i64,
-    pub duration: String,
-    pub author: String,
-    pub mid: i64,
-    pub r#type: i64,
-    pub tname: String,
+    pub desc: String,
+    /// 实际接口返回秒数（数字），文档旧示例给的是字符串，故保留原始 JSON。
+    pub duration: serde_json::Value,
     pub pubdate: i64,
-    pub is_live_playback: bool,
-    pub is_follow: bool,
-    pub is_upower_exclusive: bool,
+    pub tname: String,
+    pub owner: Option<VideoOwner>,
+    pub stat: Option<VideoStat>,
+    pub r#type: Option<i64>,
+    // 以下字段在旧文档/部分响应中存在，保留兼容。
+    pub url: Option<String>,
+    pub author: Option<String>,
+    pub mid: Option<i64>,
+    pub play: Option<i64>,
+    pub danmaku: Option<i64>,
+    pub is_live_playback: Option<bool>,
+    pub is_follow: Option<bool>,
+    pub is_upower_exclusive: Option<bool>,
     pub cnt_info: Option<VideoStat>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(default)]
-pub struct VideoRecommendResult {
-    pub list: Vec<VideoRecommendItem>,
-}
+/// `x/web-interface/archive/related` 的 `data` 直接就是推荐视频数组。
+pub type VideoRecommendResult = Vec<VideoRecommendItem>;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default)]
@@ -475,4 +505,32 @@ pub struct VideoRcmdItem {
 pub struct VideoRcmdJump {
     pub goto: String,
     pub uri: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn video_ids_cid_of_page() {
+        let ids = VideoIds {
+            aid: 1,
+            cid: 10,
+            pages: vec![
+                VideoPage {
+                    cid: 10,
+                    page: 1,
+                    ..Default::default()
+                },
+                VideoPage {
+                    cid: 20,
+                    page: 2,
+                    ..Default::default()
+                },
+            ],
+        };
+        assert_eq!(ids.cid_of_page(1), Some(10));
+        assert_eq!(ids.cid_of_page(2), Some(20));
+        assert_eq!(ids.cid_of_page(3), None);
+    }
 }

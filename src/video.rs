@@ -150,6 +150,9 @@ impl VideoClient {
     ///
     /// `GET https://api.bilibili.com/x/web-interface/ranking/v2`
     ///
+    /// 该接口一次返回 100 条，且**不支持** `pn` / `ps` 参数，因此这里在客户端
+    /// 对结果做本地分页，保持 CLI 的 `--pn` / `--ps` 语义。
+    ///
     /// - `pn`: 页码 (默认1)
     /// - `ps`: 每页项数 (默认20)
     /// - `rid`: 目标分区 tid (默认0=全站, 仅支持主分区)
@@ -159,15 +162,82 @@ impl VideoClient {
         ps: Option<i64>,
         rid: Option<&str>,
     ) -> Result<BiliResponse<VideoHotResult>, BiliError> {
-        let params = Params::new()
-            .push_val("pn", pn.unwrap_or(1))
-            .push_val("ps", ps.unwrap_or(20))
-            .push("rid", rid.unwrap_or("0"));
-        self.client
-            .get(
+        let params = Params::new().push("rid", rid.unwrap_or("0"));
+        let resp = self
+            .client
+            .get::<VideoHotResult>(
                 "https://api.bilibili.com/x/web-interface/ranking/v2",
                 params,
             )
-            .await
+            .await?;
+        Ok(paginate_hot(resp, pn.unwrap_or(1), ps.unwrap_or(20)))
+    }
+}
+
+/// Slice the 100-item ranking response according to `pn` / `ps`.
+fn paginate_hot(
+    mut resp: BiliResponse<VideoHotResult>,
+    pn: i64,
+    ps: i64,
+) -> BiliResponse<VideoHotResult> {
+    let pn = pn.max(1);
+    let ps = ps.max(1);
+    if let Some(data) = &mut resp.data {
+        let start = usize::try_from(pn.saturating_sub(1).saturating_mul(ps)).unwrap_or(usize::MAX);
+        let page_size = usize::try_from(ps).unwrap_or(usize::MAX);
+        data.list = std::mem::take(&mut data.list)
+            .into_iter()
+            .skip(start)
+            .take(page_size)
+            .collect();
+    }
+    resp
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{VideoHotItem, VideoHotResult};
+
+    fn hot_response(count: i64) -> BiliResponse<VideoHotResult> {
+        BiliResponse {
+            code: 0,
+            message: String::new(),
+            ttl: Some(1),
+            data: Some(VideoHotResult {
+                list: (0..count)
+                    .map(|aid| VideoHotItem {
+                        aid,
+                        ..VideoHotItem::default()
+                    })
+                    .collect(),
+                note: None,
+            }),
+        }
+    }
+
+    fn aids(resp: &BiliResponse<VideoHotResult>) -> Vec<i64> {
+        resp.data
+            .as_ref()
+            .map(|d| d.list.iter().map(|v| v.aid).collect())
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn hot_paginates_locally() {
+        let page = paginate_hot(hot_response(45), 2, 20);
+        assert_eq!(aids(&page), (20..40).collect::<Vec<_>>());
+
+        let last = paginate_hot(hot_response(45), 3, 20);
+        assert_eq!(aids(&last), (40..45).collect::<Vec<_>>());
+
+        let beyond = paginate_hot(hot_response(45), 4, 20);
+        assert_eq!(aids(&beyond), Vec::<i64>::new());
+    }
+
+    #[test]
+    fn hot_rejects_non_positive_page_params() {
+        let page = paginate_hot(hot_response(5), 0, 0);
+        assert_eq!(aids(&page), vec![0]);
     }
 }
