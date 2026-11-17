@@ -54,6 +54,16 @@ impl Respond for Always500 {
     }
 }
 
+/// Minimal response shape for the retry test.
+///
+/// The HTTP layer only needs `data.has_more` here, so no feature-gated model
+/// from `bili::types` is involved — this test stays independent of the
+/// `history` feature.
+#[derive(serde::Deserialize)]
+struct RetryProbe {
+    has_more: bool,
+}
+
 #[tokio::test]
 async fn get_retries_transient_server_errors() {
     let server = MockServer::start().await;
@@ -81,7 +91,7 @@ async fn get_retries_transient_server_errors() {
     let client = test_client(&cookie_path);
     let url = format!("{}/history", server.uri());
     let resp = client
-        .get::<bili::types::HistoryResult>(&url, Params::new())
+        .get::<RetryProbe>(&url, Params::new())
         .await
         .expect("retry should eventually succeed");
 

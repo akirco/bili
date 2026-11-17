@@ -1,6 +1,6 @@
 use crate::client::{BiliClient, BiliClientInner, BiliResponse, FormBuilder, Params};
 use crate::error::BiliError;
-use crate::types::{CoinResult, HasCoinResult, HasLikeResult, TripleResult};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -120,4 +120,31 @@ impl ActionClient {
             )
             .await
     }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct CoinResult {
+    pub like: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct HasCoinResult {
+    pub multiply: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct HasLikeResult {
+    pub like: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct TripleResult {
+    pub like: bool,
+    pub coin: bool,
+    pub fav: bool,
+    pub multiply: i64,
 }

@@ -10,13 +10,12 @@ license = "MIT"
 keywords = ["api", "bilibili", "cli", "danmaku"]
 categories = ["api-bindings", "command-line-utilities"]
 
-[lib]
-name = "bili"
-path = "src/lib.rs"
-
+# lib.rs is auto-discovered at src/lib.rs under the package name, so no
+# `[lib]` section is needed. The binary lives inside the `cli` module tree;
+# only `path` and `required-features` have to be declared explicitly.
 [[bin]]
 name = "bili"
-path = "src/bin/bili.rs"
+path = "src/cli/bin/bili.rs"
 required-features = ["cli"]
 
 [dependencies]
@@ -47,17 +46,24 @@ qrcode = { version = "0.14.1", default-features = false, optional = true }
 wiremock = "0.6"
 
 [features]
-default = ["action", "audio", "cli", "comment", "danmaku", "fav", "history", "login", "search", "subtitle", "user", "video"]
+default = ["action", "audio", "cli", "comment", "danmaku", "fav", "history", "live", "login", "search", "subtitle", "user", "video"]
 action = []
 audio = []
-cli = ["action", "audio", "comment", "danmaku", "dep:clap", "dep:clap_complete", "dep:qrcode", "fav", "history", "login", "search", "subtitle", "user", "video"]
+# The CLI is a self-contained unit: argument parsing, dispatch, output and the
+# download engine all live under `src/cli/`, so enabling `cli` pulls in every
+# domain it can drive.
+cli = ["action", "audio", "comment", "danmaku", "dep:clap", "dep:clap_complete", "dep:qrcode", "fav", "history", "live", "login", "search", "subtitle", "user", "video"]
 comment = []
 danmaku = []
 fav = []
-history = []
+# `history` embeds video model types (`VideoPage`, `VideoOwner`, ...),
+# so the history feature genuinely depends on the video one.
+history = ["video"]
+live = []
 login = []
 search = []
-subtitle = []
+# `subtitle` returns `VideoSubtitle`, which lives in the video models.
+subtitle = ["video"]
 user = []
 video = []
 

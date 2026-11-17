@@ -7,50 +7,35 @@ const MIXIN_KEY_ENC_TAB: [usize; 64] = [
     54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52,
 ];
 
-const DEFAULT_TTL: Duration = Duration::from_hours(6);
-
 /// Cached WBI keys, including the precomputed `mixin_key` so it does not have
 /// to be rebuilt for every signed request.
+///
+/// Only the derived `mixin_key` and its expiry are needed after construction;
+/// the raw `img_key`/`sub_key` are consumed by [`get_mixin_key`].
 #[derive(Clone)]
-pub struct WbiCache {
-    pub img_key: String,
-    pub sub_key: String,
-    pub mixin_key: String,
-    pub expires: Instant,
+pub(crate) struct WbiCache {
+    pub(crate) mixin_key: String,
+    pub(crate) expires: Instant,
 }
 
 impl WbiCache {
     #[must_use]
-    pub fn new(img_key: String, sub_key: String) -> Self {
-        Self::with_ttl(img_key, sub_key, DEFAULT_TTL)
-    }
-
-    #[must_use]
-    pub fn with_ttl(img_key: String, sub_key: String, ttl: Duration) -> Self {
-        let mut mixin_key = String::with_capacity(32);
-        let raw = format!("{img_key}{sub_key}");
-        for &i in MIXIN_KEY_ENC_TAB.iter().take(32) {
-            if let Some(&byte) = raw.as_bytes().get(i) {
-                mixin_key.push(byte as char);
-            }
-        }
+    pub(crate) fn with_ttl(img_key: &str, sub_key: &str, ttl: Duration) -> Self {
         Self {
-            img_key,
-            sub_key,
-            mixin_key,
+            mixin_key: get_mixin_key(&format!("{img_key}{sub_key}")),
             expires: Instant::now() + ttl,
         }
     }
 
     #[must_use]
-    pub fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         Instant::now() < self.expires
     }
 }
 
 /// Shuffle `img_key` + `sub_key` with [`MIXIN_KEY_ENC_TAB`] and take the first 32 chars.
 #[must_use]
-pub fn get_mixin_key(orig: &str) -> String {
+pub(crate) fn get_mixin_key(orig: &str) -> String {
     MIXIN_KEY_ENC_TAB
         .iter()
         .take(32)
@@ -63,11 +48,13 @@ pub fn get_mixin_key(orig: &str) -> String {
 ///
 /// The returned params have `!'()*` stripped from values, matching what is sent
 /// on the wire and what `w_rid` is computed over.
-#[must_use]
-#[allow(clippy::needless_pass_by_value)] // by-value keeps the public API chainable
-pub fn signed_params(params: Params, img_key: &str, sub_key: &str) -> Params {
+///
+/// Only used by tests: production callers go through
+/// [`signed_params_with_mixin`] with the cached `mixin_key`.
+#[cfg(test)]
+fn signed_params(params: &Params, img_key: &str, sub_key: &str) -> Params {
     let mixin_key = get_mixin_key(&format!("{img_key}{sub_key}"));
-    signed_params_with_mixin(&params, &mixin_key)
+    signed_params_with_mixin(params, &mixin_key)
 }
 
 /// Sign `params` using a precomputed `mixin_key`.
@@ -186,7 +173,7 @@ mod tests {
     #[test]
     fn signed_params_sends_the_filtered_values_it_signs() {
         let params = Params::new().push("keyword", "don't (rust)*!");
-        let signed = signed_params(params, "img_key", "sub_key");
+        let signed = signed_params(&params, "img_key", "sub_key");
         let value = signed
             .iter()
             .find(|(k, _)| *k == "keyword")
@@ -197,7 +184,7 @@ mod tests {
     #[test]
     fn signed_params_contains_wts_and_w_rid() {
         let params = Params::new().push("foo", "bar");
-        let result = signed_params(params, "img_key", "sub_key");
+        let result = signed_params(&params, "img_key", "sub_key");
         assert!(result.iter().any(|(k, _)| k == "wts"));
         assert!(result.iter().any(|(k, _)| k == "w_rid"));
         assert!(result.iter().any(|(k, v)| k == "foo" && v == "bar"));
@@ -206,7 +193,7 @@ mod tests {
     #[test]
     fn signed_params_deterministic_for_same_input() {
         let p1 = Params::new().push("key", "value");
-        let r1 = signed_params(p1, "img_key", "sub_key");
+        let r1 = signed_params(&p1, "img_key", "sub_key");
 
         let rid = r1
             .iter()
@@ -220,15 +207,10 @@ mod tests {
 
     #[test]
     fn wbi_cache_validity() {
-        let cache = WbiCache::with_ttl(
-            "img".to_string(),
-            "sub".to_string(),
-            Duration::from_secs(3600),
-        );
+        let cache = WbiCache::with_ttl("img", "sub", Duration::from_secs(3600));
         assert!(cache.is_valid());
 
-        let expired =
-            WbiCache::with_ttl("img".to_string(), "sub".to_string(), Duration::from_secs(0));
+        let expired = WbiCache::with_ttl("img", "sub", Duration::from_secs(0));
         std::thread::sleep(Duration::from_millis(10));
         assert!(!expired.is_valid());
     }

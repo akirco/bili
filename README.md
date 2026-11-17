@@ -64,6 +64,10 @@ Commands:
   subtitle          Subtitle list [requires: --bvid]
   subtitle-summary  Subtitle summary [requires: --bvid]
   audio             Audio stream URL [requires: --sid]
+  live-search        Search live rooms [requires: --keyword]
+  live-media         Live stream URLs [requires: --room]
+  live-categories    Live category (area) list
+  live-area          Live rooms in one category [requires: --parent, --area]
   playurl           Video play URL [requires: --bvid]
   download          Download video [options: --dir|--page|--qn|--fourk|--audio-only]
   help              Print this message or the help of the given subcommand(s)
@@ -83,6 +87,20 @@ Options:
 > `fav-list` 返回的 `id` 才是 `fav-items --media-id` 需要的收藏夹 media_id；`fid` 是旧版短 id，不要混用。
 
 > `audio` 是 B 站历史音频接口（音频区已停止投稿），目前仍可播放历史音频，付费音频仅返回试听片段。
+
+> 直播相关：
+>
+> - `live-search --keyword 原神` 搜直播间，结果里的 `cate_name`/`title` 命中关键字时会带
+>   `<em>` 高亮标签，库侧用 `cate_name_text()` / `title_text()` 取纯文本。
+> - `live-media --room 6` 返回「协议 → 格式 → 编码 → 地址」四层结构，用 `--urls` 只打印
+>   可直接播放的地址（`--flv` 把 HTTP-FLV 排到最前）。注意 `ts` 与 `fmp4` 都是 HLS
+>   （地址是 m3u8），只有 `flv` 是 FLV；拉流时需带 `Referer: https://live.bilibili.com/`。
+> - `live-categories` 返回父分区 + 子分区；`--flat` 拍平成一维列表。
+>   该接口父分区 `id` 是数字、子分区 `id` 是字符串，库侧分别保留原始类型。
+> - `live-area --parent 2 --area 86` 取某个分区**当前正在直播**的房间（一页 40 条，
+>   按人气排序），`--area 0` 表示整个父分区，`--pn` 翻页。
+>   这个接口要登录：匿名请求会被风控拦成 `-352`。它还需要一个从分区页 HTML 里
+>   抓出来的 `access_id` 令牌（`w_webid`），库侧会自动去取并按分区缓存。
 
 ## License
 

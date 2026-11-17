@@ -8,12 +8,25 @@
     clippy::needless_raw_string_hashes,
     clippy::too_many_lines
 )]
+// 本文件覆盖 7 个 API 域的响应模型；模型随 feature 门控，
+// 缺任一 feature 时整体跳过，保证 `cargo test --no-default-features` 仍可编译。
+#![cfg(all(
+    feature = "audio",
+    feature = "comment",
+    feature = "fav",
+    feature = "history",
+    feature = "search",
+    feature = "user",
+    feature = "video"
+))]
 
-use bili::types::{
-    AudioStreamUrl, CommentListWbi, FavFolderInfo, FavResourceListResult, HistoryResult,
-    SearchResultItem, SearchTypeResult, SearchVideo, UserInfo, UserStat, UserVideoListResult,
-    VideoRecommendItem,
-};
+use bili::audio::AudioStreamUrl;
+use bili::comment::CommentListWbi;
+use bili::fav::{FavFolderInfo, FavResourceListResult};
+use bili::history::HistoryResult;
+use bili::search::{SearchResultItem, SearchTypeResult, SearchVideo};
+use bili::user::{UserInfo, UserStat, UserVideoListResult};
+use bili::video::VideoRecommendItem;
 
 #[test]
 fn user_info_uses_snake_case_fields() {

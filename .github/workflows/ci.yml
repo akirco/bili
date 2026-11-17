@@ -57,6 +57,7 @@ jobs:
         feature:
           - action
           - audio
+          - cli
           - comment
           - danmaku
           - fav
